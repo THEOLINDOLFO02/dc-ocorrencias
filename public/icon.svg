@@ -1,5 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1B3A6B"/>
-  <text x="256" y="310" font-family="Arial,sans-serif" font-weight="bold" font-size="220" text-anchor="middle" fill="white">DC</text>
-  <rect x="80" y="360" width="352" height="20" rx="10" fill="#FB923C"/>
+  <!-- Fundo laranja com cantos arredondados -->
+  <rect width="512" height="512" rx="64" fill="#E8730A"/>
+
+  <!-- Faixa azul superior -->
+  <rect x="0" y="0" width="512" height="100" rx="64" fill="#2B2483"/>
+  <rect x="0" y="36" width="512" height="64" fill="#2B2483"/>
+
+  <!-- Faixa azul inferior -->
+  <rect x="0" y="412" width="512" height="100" rx="64" fill="#2B2483"/>
+  <rect x="0" y="412" width="512" height="64" fill="#2B2483"/>
+
+  <!-- Texto DEFESA CIVIL no topo -->
+  <text x="256" y="82" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="72" text-anchor="middle" fill="white" letter-spacing="2">DEFESA CIVIL</text>
+
+  <!-- Símbolo hexágono central -->
+  <polygon points="256,170 316,205 316,275 256,310 196,275 196,205" fill="none" stroke="white" stroke-width="22"/>
+
+  <!-- Triângulo azul interno -->
+  <polygon points="256,200 300,272 212,272" fill="#2B2483"/>
+
+  <!-- Faixa diagonal esquerda -->
+  <polygon points="60,180 160,180 100,332 0,332" fill="white" opacity="0.9"/>
+
+  <!-- Faixa diagonal direita -->
+  <polygon points="352,180 452,180 512,332 412,332" fill="white" opacity="0.9"/>
+
+  <!-- Texto R.O na base -->
+  <text x="256" y="490" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="72" text-anchor="middle" fill="white" letter-spacing="8">R.O</text>
 </svg>
