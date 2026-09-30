@@ -1297,15 +1297,19 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
           {/* ─ Cabeçalho ─ */}
           <tbody>
             <tr>
-              <TCell className="w-16 text-center border-r-2 border-gray-700">
-                <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-500 text-xs">DC</div>
-                <div className="font-black text-[9px] mt-0.5">DEFESA CIVIL</div>
-                <div className="text-[8px] text-gray-500">Cajamar/SP</div>
+              <TCell className="w-20 text-center border-r-2 border-gray-700 py-2">
+                <img src="/brasao-cajamar.gif" alt="Brasão Cajamar" className="w-16 h-16 mx-auto object-contain" />
               </TCell>
-              <TCell className="text-center border-r-2 border-gray-700">
-                <div className="font-black text-base text-gray-800 tracking-wide">RELATÓRIO DE OCORRÊNCIA</div>
+              <TCell className="text-center border-r-2 border-gray-700 py-1">
+                <div className="text-[9px] text-gray-600 leading-tight">Prefeitura do Município de Cajamar</div>
+                <div className="text-[9px] text-gray-600 leading-tight">ESTADO DE SÃO PAULO</div>
+                <div className="text-[9px] text-gray-600 leading-tight mb-1">Coordenadoria de Proteção e Defesa Civil</div>
+                <div className="font-black text-sm text-gray-800 tracking-wide">RELATÓRIO DE OCORRÊNCIA</div>
               </TCell>
-              <TCell className="w-32 text-right">
+              <TCell className="w-24 text-center border-r-2 border-gray-700 py-2">
+                <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-16 h-16 mx-auto object-contain" />
+              </TCell>
+              <TCell className="w-28 text-right">
                 <TLabel>Emergência</TLabel>
                 <div className="text-[10px] mt-0.5">
                   <CB v={ro.emergency === true} /> Sim &nbsp;
@@ -1471,6 +1475,16 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             </tr>
             <tr>
               <TCell colSpan={3}><div className="min-h-[30px] whitespace-pre-wrap text-[10px]">{ro.conclusion}</div></TCell>
+            </tr>
+
+            {/* ─ Rodapé ─ */}
+            <tr className="border-t-2 border-gray-700">
+              <TCell colSpan={4} className="text-center py-2">
+                <div className="text-[8px] text-gray-500 leading-relaxed">
+                  Av. Tenente Marques, 3861 – CEP 06579-001 – Portais (Polvilho) – Cajamar/SP – Tel. (11) 4446-0199
+                  &nbsp;|&nbsp; E-mail: defesacivil@cajamar.sp.gov.br
+                </div>
+              </TCell>
             </tr>
           </tbody>
         </table>

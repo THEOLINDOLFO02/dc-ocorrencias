@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
+        includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'logo-dc-ro.png', 'brasao-cajamar.gif', 'logo-dc-cajamar.jpg'],
         manifest: {
           name: 'Defesa Civil — Registro de Ocorrências',
           short_name: 'DC Ocorrências',
