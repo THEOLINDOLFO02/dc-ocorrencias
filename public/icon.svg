@@ -1,72 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="570" height="537" viewBox="0 0 570 537">
-  <title>Defesa Civil — R.O.</title>
-  <desc>Logo vetorial baseada na arte original fornecida, mantendo bordas, textos, cores e símbolo.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fundo azul institucional preenchendo o quadrado -->
+  <rect width="512" height="512" rx="64" fill="#29166F"/>
 
-  <defs>
-    <clipPath id="rounded">
-      <rect x="0" y="0" width="570" height="537" rx="16" ry="16"/>
-    </clipPath>
-  </defs>
-
-  <g clip-path="url(#rounded)">
-    <!-- Fundo / faixas institucionais -->
-    <rect x="0" y="0" width="570" height="537" fill="#29166F"/>
-    <rect x="0" y="87" width="570" height="361" fill="#E67817"/>
-
-    <!-- Faixa gráfica branca superior -->
-    <path fill="#FFFFFF" d="
-      M 70,284
-      L 191,113
-      L 375,113
-      L 425,166
-      L 559,114
-      L 570,114
-      L 570,234
-      L 381,234
-      L 353,188
-      L 249,188
-      L 150,284
-      Z"/>
-
-    <!-- Faixa gráfica branca inferior -->
-    <path fill="#FFFFFF" d="
-      M 0,309
-      L 189,309
-      L 218,355
-      L 324,355
-      L 422,258
-      L 502,258
-      L 380,430
-      L 196,430
-      L 147,376
-      L 0,430
-      Z"/>
-
-    <!-- Símbolo central -->
-    <path fill="#29166F" d="M 205,313 L 278,195 L 350,313 Z"/>
-
-    <!-- Texto superior -->
-    <text x="285" y="71"
-          text-anchor="middle"
-          fill="#FFFFFF"
-          font-family="Arial, Helvetica, sans-serif"
-          font-size="65"
-          font-weight="900"
-          letter-spacing="-1.8">DEFESA CIVIL</text>
-
-    <!-- Texto inferior -->
-    <text x="285" y="522"
-          text-anchor="middle"
-          fill="#FFFFFF"
-          font-family="Arial, Helvetica, sans-serif"
-          font-size="64"
-          font-weight="900"
-          letter-spacing="1">R.O</text>
+  <!-- Logo oficial escalada 60% e centralizada (redução de 40%) -->
+  <!-- Original: 570×537 → escalado para 342×322, centralizado em 512×512 -->
+  <!-- offset x: (512-342)/2 = 85 | offset y: (512-322)/2 = 95 -->
+  <g transform="translate(85, 95) scale(0.6)">
+    <svg xmlns="http://www.w3.org/2000/svg" width="570" height="537" viewBox="0 0 570 537">
+      <defs>
+        <clipPath id="rounded">
+          <rect x="0" y="0" width="570" height="537" rx="16" ry="16"/>
+        </clipPath>
+      </defs>
+      <g clip-path="url(#rounded)">
+        <rect x="0" y="0" width="570" height="537" fill="#29166F"/>
+        <rect x="0" y="87" width="570" height="361" fill="#E67817"/>
+        <path fill="#FFFFFF" d="M 70,284 L 191,113 L 375,113 L 425,166 L 559,114 L 570,114 L 570,234 L 381,234 L 353,188 L 249,188 L 150,284 Z"/>
+        <path fill="#FFFFFF" d="M 0,309 L 189,309 L 218,355 L 324,355 L 422,258 L 502,258 L 380,430 L 196,430 L 147,376 L 0,430 Z"/>
+        <path fill="#29166F" d="M 205,313 L 278,195 L 350,313 Z"/>
+        <text x="285" y="71" text-anchor="middle" fill="#FFFFFF" font-family="Arial,Helvetica,sans-serif" font-size="65" font-weight="900" letter-spacing="-1.8">DEFESA CIVIL</text>
+        <text x="285" y="522" text-anchor="middle" fill="#FFFFFF" font-family="Arial,Helvetica,sans-serif" font-size="64" font-weight="900" letter-spacing="1">R.O</text>
+      </g>
+      <rect x="0.75" y="0.75" width="568.5" height="535.5" rx="15.25" ry="15.25" fill="none" stroke="#29166F" stroke-width="1.5"/>
+    </svg>
   </g>
-
-  <!-- Contorno externo discreto, preservando a borda original -->
-  <rect x="0.75" y="0.75" width="568.5" height="535.5"
-        rx="15.25" ry="15.25"
-        fill="none" stroke="#29166F" stroke-width="1.5"/>
 </svg>
