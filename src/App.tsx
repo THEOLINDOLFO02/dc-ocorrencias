@@ -503,7 +503,16 @@ function StepCabecalho({ ro, onChange }: StepProps) {
         <SecTitle>Equipe</SecTitle>
         <div className="space-y-3">
           <Field label="Viatura" required>
-            <Input value={ro.vehicle} onChange={v => onChange({ vehicle: v })} placeholder="Ex: 001, 002..." />
+            <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+              <option value="">Selecione a viatura...</option>
+              <option value="VTR-001">VTR-001</option>
+              <option value="VTR-002">VTR-002</option>
+              <option value="VTR-003">VTR-003</option>
+              <option value="VTR-004">VTR-004</option>
+              <option value="VTR-005">VTR-005</option>
+              <option value="Outros">Outros</option>
+            </select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Agente">
@@ -646,14 +655,20 @@ function StepOcorrencia({ ro, onChange }: StepProps) {
 
       <Card>
         <SecTitle>Localização</SecTitle>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Quadrante">
-            <Input value={ro.quadrant} onChange={v => onChange({ quadrant: v })} placeholder="Q1, Q2..." />
-          </Field>
-          <Field label="Área de Risco">
-            <Input value={ro.riskArea} onChange={v => onChange({ riskArea: v })} placeholder="Sim / Não" />
-          </Field>
-        </div>
+        <Field label="Área de Risco">
+          <div className="flex gap-3 mt-1">
+            {['Sim', 'Não'].map(opt => (
+              <button key={opt} type="button"
+                onClick={() => onChange({ riskArea: opt })}
+                className={cn('flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-colors',
+                  ro.riskArea === opt
+                    ? 'bg-[#1B3A6B] border-[#1B3A6B] text-white'
+                    : 'border-gray-300 text-gray-600 bg-white')}>
+                {opt}
+              </button>
+            ))}
+          </div>
+        </Field>
       </Card>
     </div>
   );
@@ -749,7 +764,8 @@ function StepApoio({ ro, onChange }: StepProps) {
 }
 
 function StepFotos({ ro, onChange }: StepProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef   = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -773,13 +789,24 @@ function StepFotos({ ro, onChange }: StepProps) {
 
       <Card>
         <SecTitle>Fotos ({ro.photos.length})</SecTitle>
+        {/* Câmera */}
         <input ref={inputRef} type="file" accept="image/*" capture="environment" multiple
           onChange={handleFiles} className="hidden" />
-        <button type="button" onClick={() => inputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-[#1B3A6B] hover:text-[#1B3A6B] transition-colors mb-3">
-          <Camera size={20} />
-          <span className="text-sm font-semibold">Tirar foto / Adicionar imagem</span>
-        </button>
+        {/* Galeria */}
+        <input ref={galleryRef} type="file" accept="image/*" multiple
+          onChange={handleFiles} className="hidden" />
+        <div className="flex gap-2 mb-3">
+          <button type="button" onClick={() => inputRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-[#1B3A6B] hover:text-[#1B3A6B] transition-colors">
+            <Camera size={20} />
+            <span className="text-sm font-semibold">Câmera</span>
+          </button>
+          <button type="button" onClick={() => galleryRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-[#1B3A6B] hover:text-[#1B3A6B] transition-colors">
+            <FileText size={20} />
+            <span className="text-sm font-semibold">Galeria</span>
+          </button>
+        </div>
 
         <div className="space-y-4">
           {ro.photos.map((photo, idx) => (
@@ -1076,7 +1103,6 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
             <span className="text-2xl">{type?.emoji ?? '📋'}</span>
             <span className="text-sm font-bold text-gray-800">{ro.occurrenceTypeLabel}</span>
           </div>
-          <Row label="Quadrante"    value={ro.quadrant} />
           <Row label="Área de risco" value={ro.riskArea} />
         </Sec>
 
@@ -1358,7 +1384,7 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
               </TCell>
               <TCell>
                 <TLabel>Quadrante / Área de Risco</TLabel>
-                <TValue>{[ro.quadrant, ro.riskArea].filter(Boolean).join(' / ')}</TValue>
+                <TValue>{ro.riskArea}</TValue>
               </TCell>
             </tr>
 
