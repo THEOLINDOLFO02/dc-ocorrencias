@@ -828,11 +828,6 @@ function StepFotos({ ro, onChange }: StepProps) {
         </div>
       </Card>
 
-      <Card>
-        <SecTitle>Desfecho / Conclusão do Registro Fotográfico</SecTitle>
-        <Textarea value={ro.photoConclusion} onChange={v => onChange({ photoConclusion: v })}
-          placeholder="Providências tomadas e encaminhamento dado..." rows={4} />
-      </Card>
     </div>
   );
 }
@@ -864,12 +859,6 @@ function StepConcluir({ ro, onChange }: StepProps) {
             </Field>
           </div>
         </div>
-      </Card>
-
-      <Card>
-        <SecTitle>Documentos Relacionados</SecTitle>
-        <Textarea value={ro.relatedDocs} onChange={v => onChange({ relatedDocs: v })}
-          placeholder="Documentos relacionados..." rows={2} />
       </Card>
 
       <Card>
@@ -1137,11 +1126,6 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
                 </div>
               ))}
             </div>
-            {ro.photoConclusion && (
-              <p className="text-sm text-gray-700 mt-3 pt-3 border-t border-gray-100 leading-relaxed">
-                {ro.photoConclusion}
-              </p>
-            )}
           </Sec>
         )}
 
@@ -1490,12 +1474,6 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             </tr>
 
             {/* ─ Desfecho ─ */}
-            <tr className="border-t-2 border-gray-700 bg-gray-50">
-              <TCell colSpan={3}><span className="font-black text-[10px]">DOCUMENTOS RELACIONADOS</span></TCell>
-            </tr>
-            <tr>
-              <TCell colSpan={3}><div className="min-h-[20px] text-[10px]">{ro.relatedDocs}</div></TCell>
-            </tr>
             <tr className="border-t border-gray-500 bg-gray-50">
               <TCell colSpan={3}><span className="font-black text-[10px]">DESFECHO / CONCLUSÃO</span></TCell>
             </tr>
@@ -1580,13 +1558,6 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 </tr>
               ))}
 
-              {/* Desfecho fotográfico */}
-              <tr>
-                <td colSpan={2} className="border border-gray-500 px-2 py-1 bg-gray-50">
-                  <div className="font-black text-[10px] mb-1">📋 DESFECHO / CONCLUSÃO</div>
-                  <div className="text-[10px] whitespace-pre-wrap min-h-[40px]">{ro.photoConclusion}</div>
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
