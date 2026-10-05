@@ -1091,25 +1091,64 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
 // HOME
 // ─────────────────────────────────────────────
 
-function HomeScreen({ ros, onNew, onView }: {
-  ros: OccurrenceReport[]; onNew: () => void; onView: (r: OccurrenceReport) => void;
+function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll }: {
+  ros: OccurrenceReport[];
+  onNew: () => void;
+  onView: (r: OccurrenceReport) => void;
+  onDelete: (id: string) => void;
+  onDeleteAll: () => void;
 }) {
+  const [query, setQuery]         = useState('');
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const filtered = [...ros].reverse().filter(ro =>
+    !q ||
+    ro.roNumber.toLowerCase().includes(q) ||
+    ro.occurrenceTypeLabel.toLowerCase().includes(q) ||
+    ro.neighborhood.toLowerCase().includes(q) ||
+    ro.address.toLowerCase().includes(q) ||
+    ro.rgCpf.toLowerCase().includes(q) ||
+    ro.reporterName.toLowerCase().includes(q)
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
       <div className="bg-[#1B3A6B] text-white">
-        <div className="px-4 pt-12 pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-400 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-black text-white">DC</span>
+        <div className="px-4 pt-12 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-400 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-black text-white">DC</span>
+              </div>
+              <div>
+                <p className="text-xs text-blue-300 font-medium">Defesa Civil — Cajamar/SP</p>
+                <p className="font-bold text-lg leading-tight">Registro de Ocorrências</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-blue-300 font-medium">Defesa Civil — Cajamar/SP</p>
-              <p className="font-bold text-lg leading-tight">Registro de Ocorrências</p>
-            </div>
+            {ros.length > 0 && (
+              <button type="button" onClick={() => setConfirmAll(true)}
+                className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 transition-colors flex-shrink-0"
+                title="Excluir todos">
+                <Trash2 size={18} className="text-red-300" />
+              </button>
+            )}
+          </div>
+
+          {/* Busca */}
+          <div className="mt-4 relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 pointer-events-none" />
+            <input
+              type="search" value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar por nº, tipo, bairro, rua, CPF/RG..."
+              className="w-full bg-white/10 text-white placeholder-blue-300 rounded-xl pl-9 pr-4 py-2.5 text-sm border border-white/20 focus:outline-none focus:bg-white/20" />
           </div>
         </div>
       </div>
 
+      {/* Lista */}
       <div className="flex-1 p-4 pb-28">
         {ros.length === 0 ? (
           <div className="text-center py-20">
@@ -1117,51 +1156,104 @@ function HomeScreen({ ros, onNew, onView }: {
             <p className="text-gray-500 font-semibold">Nenhum R.O. registrado</p>
             <p className="text-gray-400 text-sm mt-1">Toque em "+ Novo R.O." para começar</p>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-20">
+            <Search size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 font-semibold">Nenhum resultado</p>
+            <p className="text-gray-400 text-sm mt-1">Tente outros termos de busca</p>
+          </div>
         ) : (
           <div className="space-y-3">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-              Registros ({ros.length})
+              {q ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}` : `Registros (${ros.length})`}
             </p>
-            {[...ros].reverse().map(ro => {
+            {filtered.map(ro => {
               const type = OCCURRENCE_TYPES.find(t => t.id === ro.occurrenceTypeId);
               return (
-                <button key={ro.id} type="button" onClick={() => onView(ro)}
-                  className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-left flex items-start gap-3 active:bg-gray-50">
-                  <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-xl">
-                    {type?.emoji ?? '📋'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="font-bold text-[#1B3A6B] text-sm">R.O. {ro.roNumber}</span>
-                      <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-semibold',
-                        ro.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
-                        {ro.status === 'completed' ? 'Concluído' : 'Rascunho'}
-                      </span>
+                <div key={ro.id} className="relative">
+                  <button type="button" onClick={() => onView(ro)}
+                    className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-left flex items-start gap-3 active:bg-gray-50 pr-14">
+                    <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-xl">
+                      {type?.emoji ?? '📋'}
                     </div>
-                    <p className="text-sm text-gray-700 font-medium truncate">
-                      {ro.occurrenceTypeLabel || 'Tipo não definido'}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <Clock size={10} /> {fmtDate(ro.date)} {ro.startTime && `às ${ro.startTime}`}
-                      </span>
-                      {ro.neighborhood && <span className="truncate">{ro.neighborhood}</span>}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className="font-bold text-[#1B3A6B] text-sm">R.O. {ro.roNumber}</span>
+                        <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-semibold',
+                          ro.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
+                          {ro.status === 'completed' ? 'Concluído' : 'Rascunho'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 font-medium truncate">
+                        {ro.occurrenceTypeLabel || 'Tipo não definido'}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Clock size={10} /> {fmtDate(ro.date)} {ro.startTime && `às ${ro.startTime}`}
+                        </span>
+                        {ro.neighborhood && <span className="truncate">{ro.neighborhood}</span>}
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
-                </button>
+                  </button>
+                  {/* Botão excluir individual */}
+                  <button type="button" onClick={() => setConfirmId(ro.id)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
+      {/* FAB */}
       <div className="fixed bottom-6 left-4 right-4">
         <button type="button" onClick={onNew}
           className="w-full bg-[#1B3A6B] text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 text-base active:bg-[#142d52]">
           <Plus size={22} /> Novo R.O.
         </button>
       </div>
+
+      {/* Modal confirmação — excluir individual */}
+      {confirmId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <p className="font-bold text-gray-800 text-base mb-2">Excluir este R.O.?</p>
+            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setConfirmId(null)}
+                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm">
+                Cancelar
+              </button>
+              <button type="button" onClick={() => { onDelete(confirmId); setConfirmId(null); }}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm">
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmação — excluir todos */}
+      {confirmAll && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <p className="font-bold text-gray-800 text-base mb-2">Excluir todos os R.O.s?</p>
+            <p className="text-sm text-gray-500 mb-5">Todos os {ros.length} registros serão apagados permanentemente.</p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setConfirmAll(false)}
+                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm">
+                Cancelar
+              </button>
+              <button type="button" onClick={() => { onDeleteAll(); setConfirmAll(false); }}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm">
+                Excluir Todos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1782,6 +1874,13 @@ export default function App() {
   const handleBack = () => { setScreen('home'); setCurrentRO(null); };
   const handleEdit = () => { editMode.current = true; setScreen('wizard'); };
 
+  const handleDelete = (id: string) => {
+    persist(ros.filter(r => r.id !== id));
+  };
+  const handleDeleteAll = () => {
+    persist([]);
+  };
+
   if (screen === 'wizard' && currentRO)
     return <WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} />;
 
@@ -1791,5 +1890,5 @@ export default function App() {
   if (screen === 'view' && currentRO)
     return <ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} />;
 
-  return <HomeScreen ros={ros} onNew={handleNew} onView={handleView} />;
+  return <HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll} />;
 }
