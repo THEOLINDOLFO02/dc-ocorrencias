@@ -75,11 +75,78 @@ interface OccurrenceReport {
   filledBy: string;
   role: string;
   relatedDocs: string;
+  cobrade: { active: boolean; code: string; label: string };
   conclusion: string;
   status: 'draft' | 'completed';
   createdAt: string;
   updatedAt: string;
 }
+
+// ─────────────────────────────────────────────
+// COBRADE DATA
+// ─────────────────────────────────────────────
+
+interface CobradeItem { code: string; label: string; group: string; subgroup: string; }
+
+const COBRADE_LIST: CobradeItem[] = [
+  // ── DESASTRES NATURAIS ──
+  // Geológico > Terremotos
+  { code:'1.1.1.1.0', label:'Tremor de terra',                       group:'Desastres Naturais', subgroup:'Geológico – Terremotos' },
+  { code:'1.1.1.2.0', label:'Terremoto',                             group:'Desastres Naturais', subgroup:'Geológico – Terremotos' },
+  // Geológico > Movimento de Massa
+  { code:'1.1.3.1.1', label:'Queda / tombamento de blocos',          group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.1.4', label:'Queda / tombamento de lajes',           group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.2.1', label:'Deslizamento de solo',                  group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.2.2', label:'Deslizamento de rocha',                 group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.3.1', label:'Corrida de solo/lama',                  group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.3.2', label:'Corrida de rocha/detrito',              group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  { code:'1.1.3.4.0', label:'Subsidência e colapso de terreno',      group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
+  // Geológico > Erosão
+  { code:'1.1.4.2.0', label:'Erosão de margem fluvial',              group:'Desastres Naturais', subgroup:'Geológico – Erosão' },
+  { code:'1.1.4.3.1', label:'Erosão laminar',                        group:'Desastres Naturais', subgroup:'Geológico – Erosão' },
+  { code:'1.1.4.3.2', label:'Erosão em ravinas',                     group:'Desastres Naturais', subgroup:'Geológico – Erosão' },
+  { code:'1.1.4.3.3', label:'Erosão em boçorocas',                   group:'Desastres Naturais', subgroup:'Geológico – Erosão' },
+  // Hidrológico
+  { code:'1.2.1.1.0', label:'Inundação gradual',                     group:'Desastres Naturais', subgroup:'Hidrológico – Inundações' },
+  { code:'1.2.1.2.0', label:'Inundação brusca',                      group:'Desastres Naturais', subgroup:'Hidrológico – Inundações' },
+  { code:'1.2.2.1.0', label:'Enxurrada',                             group:'Desastres Naturais', subgroup:'Hidrológico – Enxurradas' },
+  { code:'1.2.3.1.0', label:'Alagamento',                            group:'Desastres Naturais', subgroup:'Hidrológico – Alagamentos' },
+  // Meteorológico
+  { code:'1.3.1.1.0', label:'Ciclone extratropical',                 group:'Desastres Naturais', subgroup:'Meteorológico – Sistemas de Grande Escala' },
+  { code:'1.3.1.2.0', label:'Frente fria / zona de convergência',    group:'Desastres Naturais', subgroup:'Meteorológico – Sistemas de Grande Escala' },
+  { code:'1.3.2.1.1', label:'Vendaval / ciclone extratropical local',group:'Desastres Naturais', subgroup:'Meteorológico – Tempestades Locais Severas' },
+  { code:'1.3.2.1.2', label:'Chuva intensa',                         group:'Desastres Naturais', subgroup:'Meteorológico – Tempestades Locais Severas' },
+  { code:'1.3.2.1.3', label:'Granizo',                               group:'Desastres Naturais', subgroup:'Meteorológico – Tempestades Locais Severas' },
+  { code:'1.3.2.1.4', label:'Tornado',                               group:'Desastres Naturais', subgroup:'Meteorológico – Tempestades Locais Severas' },
+  { code:'1.3.2.1.5', label:'Tempestade de raios',                   group:'Desastres Naturais', subgroup:'Meteorológico – Tempestades Locais Severas' },
+  { code:'1.3.3.1.0', label:'Onda de calor',                         group:'Desastres Naturais', subgroup:'Meteorológico – Temperaturas Extremas' },
+  { code:'1.3.3.2.1', label:'Geada',                                 group:'Desastres Naturais', subgroup:'Meteorológico – Temperaturas Extremas' },
+  { code:'1.3.3.2.2', label:'Neve',                                  group:'Desastres Naturais', subgroup:'Meteorológico – Temperaturas Extremas' },
+  // Climatológico
+  { code:'1.4.1.1.0', label:'Seca',                                  group:'Desastres Naturais', subgroup:'Climatológico – Seca / Estiagem' },
+  { code:'1.4.1.2.0', label:'Estiagem',                              group:'Desastres Naturais', subgroup:'Climatológico – Seca / Estiagem' },
+  { code:'1.4.1.5.0', label:'Baixa umidade do ar',                   group:'Desastres Naturais', subgroup:'Climatológico – Seca / Estiagem' },
+  { code:'1.4.2.1.0', label:'Incêndio florestal',                    group:'Desastres Naturais', subgroup:'Climatológico – Incêndio Florestal' },
+  { code:'1.4.2.2.0', label:'Incêndio em área de proteção ambiental',group:'Desastres Naturais', subgroup:'Climatológico – Incêndio Florestal' },
+  // Biológico
+  { code:'1.5.1.1.0', label:'Epidemia de doença infecciosa viral',   group:'Desastres Naturais', subgroup:'Biológico – Epidemias' },
+  { code:'1.5.1.2.0', label:'Epidemia de doença bacteriana',         group:'Desastres Naturais', subgroup:'Biológico – Epidemias' },
+  { code:'1.5.1.3.0', label:'Epidemia de doença parasitária',        group:'Desastres Naturais', subgroup:'Biológico – Epidemias' },
+  { code:'1.5.2.1.0', label:'Infestação de animais',                 group:'Desastres Naturais', subgroup:'Biológico – Infestações' },
+  { code:'1.5.2.2.0', label:'Infestação de insetos',                 group:'Desastres Naturais', subgroup:'Biológico – Infestações' },
+  // ── DESASTRES TECNOLÓGICOS ──
+  { code:'2.1.3.1.0', label:'Desastre em usina nuclear',             group:'Desastres Tecnológicos', subgroup:'Substâncias Radioativas' },
+  { code:'2.2.1.1.0', label:'Vazamento em planta/armazenamento industrial', group:'Desastres Tecnológicos', subgroup:'Produtos Perigosos – Planta Industrial' },
+  { code:'2.2.2.1.0', label:'Transporte rodoviário de produtos perigosos',  group:'Desastres Tecnológicos', subgroup:'Produtos Perigosos – Transporte' },
+  { code:'2.2.2.2.0', label:'Transporte ferroviário de produtos perigosos', group:'Desastres Tecnológicos', subgroup:'Produtos Perigosos – Transporte' },
+  { code:'2.2.2.5.0', label:'Transporte dutoviário de produtos perigosos',  group:'Desastres Tecnológicos', subgroup:'Produtos Perigosos – Transporte' },
+  { code:'2.3.1.1.0', label:'Incêndio em área urbana',               group:'Desastres Tecnológicos', subgroup:'Incêndios Urbanos' },
+  { code:'2.4.1.1.0', label:'Colapso de edificação',                 group:'Desastres Tecnológicos', subgroup:'Obras Civis' },
+  { code:'2.4.2.1.0', label:'Ruptura de barragem',                   group:'Desastres Tecnológicos', subgroup:'Obras Civis' },
+  { code:'2.5.1.1.0', label:'Acidente de transporte rodoviário',     group:'Desastres Tecnológicos', subgroup:'Transporte' },
+  { code:'2.5.3.1.0', label:'Acidente de transporte aéreo',          group:'Desastres Tecnológicos', subgroup:'Transporte' },
+  { code:'2.5.4.1.0', label:'Acidente de transporte aquaviário',     group:'Desastres Tecnológicos', subgroup:'Transporte' },
+];
 
 // ─────────────────────────────────────────────
 // DATA
@@ -190,7 +257,8 @@ function createNewRO(): OccurrenceReport {
     agencies: DEFAULT_AGENCIES.map(a => ({ ...a })),
     losses: { furniture: false, food: false, clothes: false, documents: false, property: false, others: false, othersDesc: '', victims: '', injured: '', deaths: '' },
     photoScenario: '', photos: [], photoConclusion: '',
-    observations: '', declarant1: '', declarant2: '', filledBy: '', role: '', relatedDocs: '', conclusion: '',
+    observations: '', declarant1: '', declarant2: '', filledBy: '', role: '', relatedDocs: '',
+    cobrade: { active: false, code: '', label: '' }, conclusion: '',
     status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   };
 }
@@ -579,6 +647,59 @@ function StepSolicitante({ ro, onChange }: StepProps) {
   );
 }
 
+function CobradeSelector({ cobrade, onChange }: {
+  cobrade: { active: boolean; code: string; label: string };
+  onChange: (c: { active: boolean; code: string; label: string }) => void;
+}) {
+  const existingItem = COBRADE_LIST.find(c => c.code === cobrade.code);
+  const [selGroup, setSelGroup] = useState<string>(existingItem?.group ?? '');
+  const [selSub,   setSelSub]   = useState<string>(existingItem?.subgroup ?? '');
+
+  const groups    = [...new Set(COBRADE_LIST.map(c => c.group))];
+  const subgroups = selGroup ? [...new Set(COBRADE_LIST.filter(c => c.group === selGroup).map(c => c.subgroup))] : [];
+  const items     = selSub   ? COBRADE_LIST.filter(c => c.subgroup === selSub) : [];
+
+  const sel = (cls: string) =>
+    `w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${cls}`;
+
+  return (
+    <div className="mt-3 space-y-3">
+      <Field label="1. Grupo">
+        <select value={selGroup} onChange={e => { setSelGroup(e.target.value); setSelSub(''); onChange({ ...cobrade, code: '', label: '' }); }} className={sel('')}>
+          <option value="">Selecione o grupo...</option>
+          {groups.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+      </Field>
+      {selGroup && (
+        <Field label="2. Subgrupo / Tipo">
+          <select value={selSub} onChange={e => { setSelSub(e.target.value); onChange({ ...cobrade, code: '', label: '' }); }} className={sel('')}>
+            <option value="">Selecione o subgrupo...</option>
+            {subgroups.map(s => <option key={s} value={s}>{s.split(' – ')[1] ?? s}</option>)}
+          </select>
+        </Field>
+      )}
+      {selSub && (
+        <Field label="3. Evento / Código">
+          <select value={cobrade.code} onChange={e => {
+            const item = COBRADE_LIST.find(c => c.code === e.target.value);
+            if (item) onChange({ active: true, code: item.code, label: item.label });
+          }} className={sel('')}>
+            <option value="">Selecione o evento...</option>
+            {items.map(i => <option key={i.code} value={i.code}>{i.label}</option>)}
+          </select>
+        </Field>
+      )}
+      {cobrade.code && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+          <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wider mb-0.5">Código COBRADE selecionado</p>
+          <p className="text-sm font-bold text-orange-900 font-mono">{cobrade.code}</p>
+          <p className="text-xs text-orange-700 mt-0.5">{cobrade.label}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepOcorrencia({ ro, onChange }: StepProps) {
   const [search, setSearch] = useState('');
 
@@ -669,6 +790,32 @@ function StepOcorrencia({ ro, onChange }: StepProps) {
             ))}
           </div>
         </Field>
+      </Card>
+
+      <Card>
+        <SecTitle>COBRADE</SecTitle>
+        <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+          Classificação e Codificação Brasileira de Desastres. Preencha somente se a ocorrência se enquadrar como desastre.
+        </p>
+        <Field label="Esta ocorrência é um desastre (COBRADE)?">
+          <div className="flex gap-3 mt-1">
+            {['Sim', 'Não'].map(opt => {
+              const isActive = opt === 'Sim' ? !!ro.cobrade?.active : ro.cobrade?.active === false;
+              return (
+                <button key={opt} type="button"
+                  onClick={() => onChange({ cobrade: { active: opt === 'Sim', code: '', label: '' } })}
+                  className={cn('flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-colors',
+                    isActive ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 text-gray-600 bg-white')}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        {ro.cobrade?.active && (
+          <CobradeSelector cobrade={ro.cobrade} onChange={c => onChange({ cobrade: c })} />
+        )}
       </Card>
     </div>
   );
@@ -1093,6 +1240,9 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
             <span className="text-sm font-bold text-gray-800">{ro.occurrenceTypeLabel}</span>
           </div>
           <Row label="Área de risco" value={ro.riskArea} />
+          {ro.cobrade?.active && ro.cobrade.code && (
+            <Row label="COBRADE" value={`${ro.cobrade.code} — ${ro.cobrade.label}`} />
+          )}
         </Sec>
 
         {selectedAgencies.length > 0 && (
@@ -1367,10 +1517,19 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 <TValue>{ro.occurrenceTypeLabel}</TValue>
               </TCell>
               <TCell>
-                <TLabel>Quadrante / Área de Risco</TLabel>
+                <TLabel>Área de Risco</TLabel>
                 <TValue>{ro.riskArea}</TValue>
               </TCell>
             </tr>
+            {ro.cobrade?.active && ro.cobrade.code && (
+              <tr className="border-t border-gray-400">
+                <TCell colSpan={3} className="bg-orange-50">
+                  <TLabel>COBRADE — Classificação de Desastre</TLabel>
+                  <TValue className="font-mono font-bold">{ro.cobrade.code}</TValue>
+                  <TValue>{ro.cobrade.label}</TValue>
+                </TCell>
+              </tr>
+            )}
 
             <tr>
               <TCell>
