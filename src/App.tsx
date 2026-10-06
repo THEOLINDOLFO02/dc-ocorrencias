@@ -51,6 +51,7 @@ interface OccurrenceReport {
   startTime: string;
   endTime: string;
   origin: string;
+  originText: string;
   agent: string;
   re: string;
   reporterName: string;
@@ -71,12 +72,16 @@ interface OccurrenceReport {
   photoConclusion: string;
   observations: string;
   declarant1: string;
-  declarant2: string;
+  declarant1Role: string;
+  declarant1Sig: string;
+  agentParticipants: string[];
   filledBy: string;
   role: string;
   relatedDocs: string;
   cobrade: { active: boolean; code: string; label: string };
   conclusion: string;
+  conclusionStatus: 'encaminhar' | 'arquivar' | 'pendente' | 'monitoramento' | '';
+  encaminharDest: string[];
   status: 'draft' | 'completed';
   createdAt: string;
   updatedAt: string;
@@ -212,11 +217,69 @@ const DEFAULT_AGENCIES: Agency[] = [
 ];
 
 const ORIGINS = [
-  { id: '199',      label: '199'              },
-  { id: 'PMC',      label: 'PMC'              },
-  { id: 'ouvidoria',label: 'Ouvidoria'        },
-  { id: 'procAdm',  label: 'Proc. Adm./Ofício'},
-  { id: 'outros',   label: 'Outros'           },
+  { id: '199',         label: '199'                                       },
+  { id: 'presencial',  label: 'Presencial na Base'                        },
+  { id: 'demandaInt',  label: 'Demanda interna'                           },
+  { id: 'PMC',         label: 'PMC (Prefeitura – outras secretarias)'     },
+  { id: 'procAdm',     label: 'Proc. Adm. nº'       , hasText: true       },
+  { id: 'oficio',      label: 'Ofício nº'            , hasText: true       },
+  { id: 'outros',      label: 'Outros'               , hasText: true       },
+];
+
+const AGENTS: { name: string; role: string }[] = [
+  { name: 'AMERICO FERREIRA SOARES',                      role: 'Agente de Defesa Civil' },
+  { name: 'ANDREA DE OLIVEIRA SOUSA',                     role: 'Agente de Defesa Civil' },
+  { name: 'ANGELA MARIA MACIEL GONCALVES BARBOSA',        role: 'Agente de Defesa Civil' },
+  { name: 'ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA',     role: 'Coordenador Municipal de Proteção e Defesa Civil' },
+  { name: 'ASSUERO LOPES DA SILVA',                       role: 'Agente de Defesa Civil' },
+  { name: 'CARLOS ROBERTO BARBOSA',                       role: 'Agente de Defesa Civil' },
+  { name: 'EDUARDO WELLINGTON DE ARAUJO',                 role: 'Agente de Defesa Civil' },
+  { name: 'GABRIEL FERRACINI',                            role: 'Agente de Defesa Civil' },
+  { name: 'GILVAN ARAUJO DOS SANTOS',                     role: 'Agente de Defesa Civil' },
+  { name: 'HAMILTON MARTINS FIGUEIRA',                    role: 'Agente de Defesa Civil' },
+  { name: 'HENRIQUE SCHUNCK COSTA',                       role: 'Agente Administrativo' },
+  { name: 'ITAMAR JORGE VACARI',                          role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO AZEVEDO',                       role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO BRAZ',                          role: 'Agente de Defesa Civil' },
+  { name: 'JOSE AUGUSTO SOARES',                          role: 'Agente de Defesa Civil' },
+  { name: 'JOSE ROBERTO DE SOUZA AMARAL',                 role: 'Agente Administrativo' },
+  { name: 'LUIZ CARLOS TEIXEIRA DOS SANTOS',              role: 'Agente de Defesa Civil' },
+  { name: 'MARCIO DE FREITAS SILVESTRE',                  role: 'Agente de Defesa Civil' },
+  { name: 'MARIA LUCIA DE SOUZA ALBARRAZ',                role: 'Auxiliar de Serviços Gerais' },
+  { name: 'MARLENE PEREIRA DA SILVA',                     role: 'Auxiliar de Serviços Gerais' },
+  { name: 'ROGERIO DA SILVA RAMOS',                       role: 'Agente de Defesa Civil' },
+  { name: 'SIDINEI MARQUES BARBOZA',                      role: 'Diretor de Defesa Civil' },
+  { name: 'THEOBALDO LINDOLFO SILVA CARVALHO',            role: 'Agente de Defesa Civil' },
+  { name: 'VALDEIR DE LIMA PEREIRA ALBARRAZ',             role: 'Agente de Defesa Civil' },
+  { name: 'VANESSA ALEXANDRE DA SILVA',                   role: 'Auxiliar Administrativo' },
+  { name: 'VINICIUS DIAS CAMPOS',                         role: 'Fiscal de Meio Ambiente, Postura e Urbanismo' },
+  { name: 'WILSON ROBERTO DE SOUZA ESPINDOLA',            role: 'Agente Administrativo' },
+  { name: 'Outro (outra secretaria)',                     role: '' },
+];
+
+const SECRETARIAS = [
+  'Secretaria de Educação',
+  'Secretaria de Saúde',
+  'Secretaria de Obras e Serviços Urbanos',
+  'Secretaria de Meio Ambiente',
+  'Secretaria de Assistência e Desenvolvimento Social',
+  'Secretaria de Planejamento e Gestão',
+  'Secretaria de Administração',
+  'Secretaria de Finanças',
+  'Secretaria de Habitação',
+  'Secretaria de Segurança Pública e Trânsito',
+  'Secretaria de Cultura, Esporte e Lazer',
+  'Secretaria de Serviços Municipais',
+  'Secretaria de Governo',
+  'Gabinete do Prefeito',
+  'Procuradoria Geral do Município',
+  'Controladoria Interna',
+  'DAEC – Depto. de Águas e Esgotos de Cajamar',
+  'Vigilância Sanitária',
+  'Corpo de Bombeiros (Parceria)',
+  'Polícia Militar (Parceria)',
+  'SABESP',
+  'Outros / Externo',
 ];
 
 const STEP_LABELS = ['Cabeçalho', 'Solicitante', 'Ocorrência', 'Detalhes', 'Apoio', 'Fotos', 'Concluir'];
@@ -250,15 +313,17 @@ function createNewRO(): OccurrenceReport {
   return {
     id: genId(), roNumber: nextRONumber(), emergency: null,
     vehicle: '', date: todayISO(), startTime: nowHHMM(), endTime: '',
-    origin: '', agent: '', re: '',
+    origin: '', originText: '', agent: '', re: '',
     reporterName: '', rgCpf: '', phone: '', address: '', addressNumber: '', neighborhood: '',
     occurrenceTypeId: '', occurrenceTypeLabel: '', quadrant: '', riskArea: '',
     dynamicFields: {},
     agencies: DEFAULT_AGENCIES.map(a => ({ ...a })),
     losses: { furniture: false, food: false, clothes: false, documents: false, property: false, others: false, othersDesc: '', victims: '', injured: '', deaths: '' },
     photoScenario: '', photos: [], photoConclusion: '',
-    observations: '', declarant1: '', declarant2: '', filledBy: '', role: '', relatedDocs: '',
+    observations: '', declarant1: '', declarant1Role: '', declarant1Sig: '',
+    agentParticipants: [], filledBy: '', role: '', relatedDocs: '',
     cobrade: { active: false, code: '', label: '' }, conclusion: '',
+    conclusionStatus: '' as const, encaminharDest: [],
     status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   };
 }
@@ -582,22 +647,39 @@ function StepCabecalho({ ro, onChange }: StepProps) {
               <option value="Outros">Outros</option>
             </select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Agente">
-              <Input value={ro.agent} onChange={v => onChange({ agent: v })} placeholder="Nome" />
-            </Field>
-            <Field label="RE">
-              <Input value={ro.re} onChange={v => onChange({ re: v })} placeholder="13611" />
-            </Field>
-          </div>
+          <Field label="Agente Encarregado" required>
+            <select value={ro.agent} onChange={e => {
+              const ag = AGENTS.find(a => a.name === e.target.value);
+              onChange({ agent: e.target.value, role: ag?.role ?? '' });
+            }} className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+              <option value="">Selecione o agente encarregado...</option>
+              {AGENTS.map(a => (
+                <option key={a.name} value={a.name}>{a.name}{a.role ? ` — ${a.role}` : ''}</option>
+              ))}
+            </select>
+          </Field>
+          {ro.agent && (
+            <div className="bg-blue-50 rounded-xl px-4 py-2 text-xs text-blue-700">
+              <span className="font-semibold">Cargo:</span> {ro.role || '—'}
+            </div>
+          )}
         </div>
       </Card>
 
       <Card>
-        <SecTitle>Canal de entrada</SecTitle>
-        <div className="grid grid-cols-2 gap-2">
+        <SecTitle>Origem da Solicitação</SecTitle>
+        <div className="space-y-2">
           {ORIGINS.map(o => (
-            <Toggle key={o.id} label={o.label} active={ro.origin === o.id} onClick={() => onChange({ origin: o.id })} />
+            <div key={o.id}>
+              <Toggle label={o.label} active={ro.origin === o.id}
+                onClick={() => onChange({ origin: ro.origin === o.id ? '' : o.id, originText: '' })} />
+              {o.hasText && ro.origin === o.id && (
+                <div className="mt-1 ml-4">
+                  <Input value={ro.originText} onChange={v => onChange({ originText: v })}
+                    placeholder={o.id === 'procAdm' ? 'Número do processo...' : o.id === 'oficio' ? 'Número do ofício...' : 'Especifique...'} />
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </Card>
@@ -980,6 +1062,25 @@ function StepFotos({ ro, onChange }: StepProps) {
 }
 
 function StepConcluir({ ro, onChange }: StepProps) {
+  const [showSecretarias, setShowSecretarias] = useState(false);
+
+  const toggleAgent = (name: string) => {
+    const curr = ro.agentParticipants ?? [];
+    onChange({ agentParticipants: curr.includes(name) ? curr.filter(n => n !== name) : [...curr, name] });
+  };
+
+  const toggleDest = (s: string) => {
+    const curr = ro.encaminharDest ?? [];
+    onChange({ encaminharDest: curr.includes(s) ? curr.filter(d => d !== s) : [...curr, s] });
+  };
+
+  const statusConfig = [
+    { id: 'encaminhar',    label: 'Encaminhar',         color: 'bg-blue-100 text-blue-700 border-blue-300',   activeColor: 'bg-blue-500 text-white border-blue-600' },
+    { id: 'arquivar',      label: 'Arquivar / Finalizado', color: 'bg-green-100 text-green-700 border-green-300', activeColor: 'bg-green-500 text-white border-green-600' },
+    { id: 'pendente',      label: 'Pendente',            color: 'bg-yellow-100 text-yellow-700 border-yellow-300', activeColor: 'bg-yellow-400 text-white border-yellow-500' },
+    { id: 'monitoramento', label: 'Monitoramento',       color: 'bg-orange-100 text-orange-700 border-orange-300', activeColor: 'bg-orange-500 text-white border-orange-600' },
+  ] as const;
+
   return (
     <div className="space-y-4">
       <Card>
@@ -989,30 +1090,161 @@ function StepConcluir({ ro, onChange }: StepProps) {
       </Card>
 
       <Card>
-        <SecTitle>Assinaturas</SecTitle>
+        <SecTitle>Declarante</SecTitle>
         <div className="space-y-3">
-          <Field label="Nome do Declarante 1">
+          <Field label="Nome do Declarante">
             <Input value={ro.declarant1} onChange={v => onChange({ declarant1: v })} placeholder="Nome completo" />
           </Field>
-          <Field label="Nome do Declarante 2">
-            <Input value={ro.declarant2} onChange={v => onChange({ declarant2: v })} placeholder="Nome completo" />
+          <Field label="Função / Vínculo">
+            <Input value={ro.declarant1Role} onChange={v => onChange({ declarant1Role: v })} placeholder="Ex.: Morador, Proprietário..." />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Preenchido por">
-              <Input value={ro.filledBy} onChange={v => onChange({ filledBy: v })} placeholder="Nome do agente" />
-            </Field>
-            <Field label="Cargo">
-              <Input value={ro.role} onChange={v => onChange({ role: v })} placeholder="Cargo / função" />
-            </Field>
-          </div>
+          <Field label="Assinatura (escreva com o dedo)">
+            <SignaturePad value={ro.declarant1Sig} onChange={v => onChange({ declarant1Sig: v })} />
+          </Field>
+        </div>
+      </Card>
+
+      <Card>
+        <SecTitle>Agentes Participantes</SecTitle>
+        <p className="text-xs text-gray-500 mb-3">Selecione todos os agentes que participaram da ocorrência</p>
+        <div className="space-y-2">
+          {AGENTS.filter(a => a.role !== '').map(a => (
+            <button key={a.name} type="button"
+              onClick={() => toggleAgent(a.name)}
+              className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors',
+                (ro.agentParticipants ?? []).includes(a.name)
+                  ? 'bg-[#1B3A6B] border-[#1B3A6B] text-white'
+                  : 'bg-white border-gray-200 text-gray-700 active:bg-gray-50')}>
+              <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0',
+                (ro.agentParticipants ?? []).includes(a.name) ? 'bg-white border-white' : 'border-gray-300')}>
+                {(ro.agentParticipants ?? []).includes(a.name) && <Check size={12} className="text-[#1B3A6B]" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold truncate">{a.name}</p>
+                <p className={cn('text-[11px]', (ro.agentParticipants ?? []).includes(a.name) ? 'text-blue-200' : 'text-gray-400')}>{a.role}</p>
+              </div>
+            </button>
+          ))}
+          <button key="outro" type="button"
+            onClick={() => toggleAgent('Outro (outra secretaria)')}
+            className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors',
+              (ro.agentParticipants ?? []).includes('Outro (outra secretaria)')
+                ? 'bg-[#1B3A6B] border-[#1B3A6B] text-white'
+                : 'bg-white border-gray-200 text-gray-700 active:bg-gray-50')}>
+            <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0',
+              (ro.agentParticipants ?? []).includes('Outro (outra secretaria)') ? 'bg-white border-white' : 'border-gray-300')}>
+              {(ro.agentParticipants ?? []).includes('Outro (outra secretaria)') && <Check size={12} className="text-[#1B3A6B]" />}
+            </div>
+            <p className="text-xs font-semibold">Outro (outra secretaria)</p>
+          </button>
         </div>
       </Card>
 
       <Card>
         <SecTitle>Desfecho / Conclusão Final</SecTitle>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {statusConfig.map(s => (
+            <button key={s.id} type="button"
+              onClick={() => {
+                onChange({ conclusionStatus: ro.conclusionStatus === s.id ? '' : s.id as OccurrenceReport['conclusionStatus'] });
+                if (s.id !== 'encaminhar') onChange({ encaminharDest: [] });
+                if (s.id === 'encaminhar' && ro.conclusionStatus !== 'encaminhar') setShowSecretarias(true);
+              }}
+              className={cn('py-3 px-2 rounded-xl border-2 font-bold text-sm transition-colors',
+                ro.conclusionStatus === s.id ? s.activeColor : s.color)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {ro.conclusionStatus === 'encaminhar' && (
+          <div className="mb-3">
+            <button type="button" onClick={() => setShowSecretarias(!showSecretarias)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-semibold">
+              <span>Secretarias / Departamentos</span>
+              <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                {(ro.encaminharDest ?? []).length} selecionado(s)
+              </span>
+            </button>
+            {showSecretarias && (
+              <div className="mt-2 border border-blue-200 rounded-xl overflow-hidden">
+                {SECRETARIAS.map(s => (
+                  <button key={s} type="button" onClick={() => toggleDest(s)}
+                    className={cn('w-full flex items-center gap-3 px-4 py-3 text-left border-b border-gray-100 last:border-0 transition-colors',
+                      (ro.encaminharDest ?? []).includes(s) ? 'bg-blue-50' : 'bg-white active:bg-gray-50')}>
+                    <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0',
+                      (ro.encaminharDest ?? []).includes(s) ? 'bg-blue-500 border-blue-500' : 'border-gray-300')}>
+                      {(ro.encaminharDest ?? []).includes(s) && <Check size={12} className="text-white" />}
+                    </div>
+                    <span className="text-xs text-gray-700">{s}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <Textarea value={ro.conclusion} onChange={v => onChange({ conclusion: v })}
           placeholder="Conclusão e providências finais..." rows={3} />
       </Card>
+    </div>
+  );
+}
+
+// Componente de assinatura em canvas
+function SignaturePad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+
+  const getPos = (e: React.TouchEvent | React.MouseEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ('touches' in e) {
+      return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+    }
+    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+  };
+
+  const start = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    const canvas = canvasRef.current; if (!canvas) return;
+    drawing.current = true;
+    const ctx = canvas.getContext('2d')!;
+    const { x, y } = getPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+  const move = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!drawing.current) return; e.preventDefault();
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    ctx.strokeStyle = '#1B3A6B'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    const { x, y } = getPos(e, canvas);
+    ctx.lineTo(x, y); ctx.stroke(); ctx.moveTo(x, y);
+  };
+  const end = () => {
+    drawing.current = false;
+    const canvas = canvasRef.current; if (!canvas) return;
+    onChange(canvas.toDataURL('image/png'));
+  };
+  const clear = () => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height);
+    onChange('');
+  };
+
+  return (
+    <div>
+      <div className="relative border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-gray-50">
+        <canvas ref={canvasRef} width={600} height={150} className="w-full touch-none"
+          onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+          onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+        {value && <img src={value} alt="assinatura" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
+        {!value && <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none">Assine aqui</p>}
+      </div>
+      {value && (
+        <button type="button" onClick={clear} className="mt-1 text-xs text-red-500 underline">Limpar assinatura</button>
+      )}
     </div>
   );
 }
@@ -1371,15 +1603,29 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
           </Sec>
         )}
 
-        {ro.conclusion && (
+        {(ro.conclusion || ro.conclusionStatus) && (
           <Sec title="Desfecho / Conclusão">
-            <p className="text-sm text-gray-700 leading-relaxed">{ro.conclusion}</p>
+            {ro.conclusionStatus && (() => {
+              const map: Record<string, string> = { encaminhar: 'bg-blue-100 text-blue-700', arquivar: 'bg-green-100 text-green-700', pendente: 'bg-yellow-100 text-yellow-700', monitoramento: 'bg-orange-100 text-orange-700' };
+              const labels: Record<string, string> = { encaminhar: 'Encaminhar', arquivar: 'Arquivar / Finalizado', pendente: 'Pendente', monitoramento: 'Monitoramento' };
+              return (
+                <div className="mb-2">
+                  <span className={cn('text-xs font-bold px-3 py-1 rounded-full', map[ro.conclusionStatus] ?? '')}>{labels[ro.conclusionStatus] ?? ''}</span>
+                  {ro.conclusionStatus === 'encaminhar' && (ro.encaminharDest ?? []).length > 0 && (
+                    <p className="text-xs text-gray-600 mt-1">→ {(ro.encaminharDest ?? []).join(', ')}</p>
+                  )}
+                </div>
+              );
+            })()}
+            {ro.conclusion && <p className="text-sm text-gray-700 leading-relaxed">{ro.conclusion}</p>}
           </Sec>
         )}
 
         <Sec title="Assinaturas">
-          <Row label="Declarante 1"  value={ro.declarant1} />
-          <Row label="Declarante 2"  value={ro.declarant2} />
+          <Row label="Declarante" value={[ro.declarant1, ro.declarant1Role].filter(Boolean).join(' — ')} />
+          {(ro.agentParticipants ?? []).length > 0 && (
+            <Row label="Agentes Participantes" value={(ro.agentParticipants ?? []).join(', ')} />
+          )}
           <Row label="Preenchido por" value={[ro.filledBy, ro.role].filter(Boolean).join(' — ')} />
         </Sec>
 
@@ -1631,20 +1877,23 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 <TLabel>Hora final</TLabel><TValue>{ro.endTime}</TValue>
               </TCell>
               <TCell>
-                <TLabel>Origem</TLabel>
+                <TLabel>Origem da Solicitação</TLabel>
                 <div className="flex flex-wrap gap-x-2 mt-0.5 text-[10px]">
-                  {ORIGINS.map(o => <span key={o.id}><CB v={ro.origin === o.id} />{o.label}</span>)}
+                  {ORIGINS.map(o => (
+                    <span key={o.id}><CB v={ro.origin === o.id} />
+                      {o.label}{o.hasText && ro.origin === o.id && ro.originText ? ` ${ro.originText}` : ''}
+                    </span>
+                  ))}
                 </div>
               </TCell>
             </tr>
 
             {/* ─ Agente ─ */}
             <tr>
-              <TCell>
-                <TLabel>Agente</TLabel><TValue>{ro.agent}</TValue>
-              </TCell>
-              <TCell>
-                <TLabel>RE</TLabel><TValue>{ro.re}</TValue>
+              <TCell colSpan={2}>
+                <TLabel>Agente Encarregado</TLabel>
+                <TValue>{ro.agent}</TValue>
+                {ro.role && <TValue className="text-gray-500 text-[9px]">{ro.role}</TValue>}
               </TCell>
               <TCell>
                 <TLabel>Preenchido por / Cargo</TLabel>
@@ -1707,26 +1956,36 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             </tr>
             <tr>
               <TCell>
-                <TLabel>Nome do Declarante 1</TLabel>
+                <TLabel>Declarante</TLabel>
                 <TValue>{ro.declarant1}</TValue>
-                <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>
+                {ro.declarant1Role && <TValue className="text-gray-500 text-[9px]">{ro.declarant1Role}</TValue>}
+                {ro.declarant1Sig
+                  ? <img src={ro.declarant1Sig} alt="assinatura" className="mt-2 h-10 object-contain" />
+                  : <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
               </TCell>
-              <TCell>
-                <TLabel>Nome do Declarante 2</TLabel>
-                <TValue>{ro.declarant2}</TValue>
-                <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>
-              </TCell>
-              <TCell>
-                <TLabel>Preenchido por / Cargo</TLabel>
-                <TValue>{ro.filledBy}</TValue>
-                <TValue className="text-gray-500">{ro.role}</TValue>
-                <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>
+              <TCell colSpan={2}>
+                <TLabel>Agentes Participantes</TLabel>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] mt-0.5">
+                  {(ro.agentParticipants ?? []).length > 0
+                    ? (ro.agentParticipants ?? []).map(n => <span key={n} className="font-medium">{n}</span>)
+                    : <span className="text-gray-400">—</span>}
+                </div>
+                <div className="mt-3 border-t border-gray-400 text-[9px] text-gray-500">Assinaturas dos agentes</div>
               </TCell>
             </tr>
 
             {/* ─ Desfecho ─ */}
             <tr className="border-t border-gray-500 bg-gray-50">
-              <TCell colSpan={3}><span className="font-black text-[10px]">DESFECHO / CONCLUSÃO</span></TCell>
+              <TCell colSpan={3}>
+                <span className="font-black text-[10px]">DESFECHO / CONCLUSÃO</span>
+                {ro.conclusionStatus && (() => {
+                  const labels: Record<string, string> = { encaminhar: 'ENCAMINHAR', arquivar: 'ARQUIVAR / FINALIZADO', pendente: 'PENDENTE', monitoramento: 'MONITORAMENTO' };
+                  return <span className="ml-3 text-[9px] font-bold border border-current px-1 py-0.5 rounded">{labels[ro.conclusionStatus] ?? ''}</span>;
+                })()}
+                {ro.conclusionStatus === 'encaminhar' && (ro.encaminharDest ?? []).length > 0 && (
+                  <div className="text-[9px] mt-1 text-gray-600">→ {(ro.encaminharDest ?? []).join(' / ')}</div>
+                )}
+              </TCell>
             </tr>
             <tr>
               <TCell colSpan={3}><div className="min-h-[30px] whitespace-pre-wrap text-[10px]">{ro.conclusion}</div></TCell>
