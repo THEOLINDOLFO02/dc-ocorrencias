@@ -1803,22 +1803,21 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 <div className="text-[9px] text-gray-600 leading-tight mb-1">Coordenadoria de Proteção e Defesa Civil</div>
                 <div className="font-black text-sm text-gray-800 tracking-wide">RELATÓRIO DE OCORRÊNCIA</div>
               </TCell>
-              <TCell className="w-24 text-center border-r-2 border-gray-700 py-2">
+              <TCell className="w-24 text-center py-2">
                 <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-16 h-16 mx-auto object-contain" />
-              </TCell>
-              <TCell className="w-28 text-right">
-                <TLabel>Emergência</TLabel>
-                <div className="text-[10px] mt-0.5">
-                  <CB v={ro.emergency === true} /> Sim &nbsp;
-                  <CB v={ro.emergency === false} /> Não
-                </div>
               </TCell>
             </tr>
 
             <tr className="border-t border-gray-500">
               <TCell><TLabel>Número</TLabel><TValue>{ro.roNumber}</TValue></TCell>
-              <TCell><TLabel>Viatura</TLabel><TValue>{ro.vehicle}</TValue></TCell>
               <TCell><TLabel>Data</TLabel><TValue>{fmtDate(ro.date)}</TValue></TCell>
+              <TCell>
+                <TLabel>Emergência</TLabel>
+                <div className="text-[10px] mt-0.5 flex gap-3">
+                  <span><CB v={ro.emergency === true} /> Sim</span>
+                  <span><CB v={ro.emergency === false} /> Não</span>
+                </div>
+              </TCell>
             </tr>
 
             {/* ─ Dados da Ocorrência ─ */}
@@ -1870,14 +1869,20 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
 
             <tr>
               <TCell>
-                <TLabel>Hora inicial</TLabel><TValue>{ro.startTime}</TValue>
+                <TLabel>Viatura</TLabel><TValue>{ro.vehicle}</TValue>
               </TCell>
               <TCell>
-                <TLabel>Hora final</TLabel><TValue>{ro.endTime}</TValue>
+                <TLabel>Hora Inicial</TLabel><TValue>{ro.startTime}</TValue>
               </TCell>
               <TCell>
+                <TLabel>Hora Final</TLabel><TValue>{ro.endTime}</TValue>
+              </TCell>
+            </tr>
+
+            <tr>
+              <TCell colSpan={3}>
                 <TLabel>Origem da Solicitação</TLabel>
-                <div className="flex flex-wrap gap-x-2 mt-0.5 text-[10px]">
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-[10px]">
                   {ORIGINS.map(o => (
                     <span key={o.id}><CB v={ro.origin === o.id} />
                       {o.label}{o.hasText && ro.origin === o.id && ro.originText ? ` ${ro.originText}` : ''}
