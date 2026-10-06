@@ -226,35 +226,38 @@ const ORIGINS = [
   { id: 'outros',      label: 'Outros'               , hasText: true       },
 ];
 
-const AGENTS: { name: string; role: string }[] = [
-  { name: 'AMERICO FERREIRA SOARES',                      role: 'Agente de Defesa Civil' },
-  { name: 'ANDREA DE OLIVEIRA SOUSA',                     role: 'Agente de Defesa Civil' },
-  { name: 'ANGELA MARIA MACIEL GONCALVES BARBOSA',        role: 'Agente de Defesa Civil' },
-  { name: 'ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA',     role: 'Coordenador Municipal de Proteção e Defesa Civil' },
-  { name: 'ASSUERO LOPES DA SILVA',                       role: 'Agente de Defesa Civil' },
-  { name: 'CARLOS ROBERTO BARBOSA',                       role: 'Agente de Defesa Civil' },
-  { name: 'EDUARDO WELLINGTON DE ARAUJO',                 role: 'Agente de Defesa Civil' },
-  { name: 'GABRIEL FERRACINI',                            role: 'Agente de Defesa Civil' },
-  { name: 'GILVAN ARAUJO DOS SANTOS',                     role: 'Agente de Defesa Civil' },
-  { name: 'HAMILTON MARTINS FIGUEIRA',                    role: 'Agente de Defesa Civil' },
-  { name: 'HENRIQUE SCHUNCK COSTA',                       role: 'Agente Administrativo' },
-  { name: 'ITAMAR JORGE VACARI',                          role: 'Agente de Defesa Civil' },
-  { name: 'JOSE APARECIDO AZEVEDO',                       role: 'Agente de Defesa Civil' },
-  { name: 'JOSE APARECIDO BRAZ',                          role: 'Agente de Defesa Civil' },
-  { name: 'JOSE AUGUSTO SOARES',                          role: 'Agente de Defesa Civil' },
-  { name: 'JOSE ROBERTO DE SOUZA AMARAL',                 role: 'Agente Administrativo' },
-  { name: 'LUIZ CARLOS TEIXEIRA DOS SANTOS',              role: 'Agente de Defesa Civil' },
-  { name: 'MARCIO DE FREITAS SILVESTRE',                  role: 'Agente de Defesa Civil' },
-  { name: 'MARIA LUCIA DE SOUZA ALBARRAZ',                role: 'Auxiliar de Serviços Gerais' },
-  { name: 'MARLENE PEREIRA DA SILVA',                     role: 'Auxiliar de Serviços Gerais' },
-  { name: 'ROGERIO DA SILVA RAMOS',                       role: 'Agente de Defesa Civil' },
-  { name: 'SIDINEI MARQUES BARBOZA',                      role: 'Diretor de Defesa Civil' },
-  { name: 'THEOBALDO LINDOLFO SILVA CARVALHO',            role: 'Agente de Defesa Civil' },
-  { name: 'VALDEIR DE LIMA PEREIRA ALBARRAZ',             role: 'Agente de Defesa Civil' },
-  { name: 'VANESSA ALEXANDRE DA SILVA',                   role: 'Auxiliar Administrativo' },
-  { name: 'VINICIUS DIAS CAMPOS',                         role: 'Fiscal de Meio Ambiente, Postura e Urbanismo' },
-  { name: 'WILSON ROBERTO DE SOUZA ESPINDOLA',            role: 'Agente Administrativo' },
-  { name: 'Outro (outra secretaria)',                     role: '' },
+const toTitleCase = (s: string) =>
+  s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+const AGENTS: { name: string; display: string; role: string }[] = [
+  { name: 'AMERICO FERREIRA SOARES',                   display: toTitleCase('AMERICO FERREIRA SOARES'),                   role: 'Agente de Defesa Civil' },
+  { name: 'ANDREA DE OLIVEIRA SOUSA',                  display: toTitleCase('ANDREA DE OLIVEIRA SOUSA'),                  role: 'Agente de Defesa Civil' },
+  { name: 'ANGELA MARIA MACIEL GONCALVES BARBOSA',     display: toTitleCase('ANGELA MARIA MACIEL GONCALVES BARBOSA'),     role: 'Agente de Defesa Civil' },
+  { name: 'ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA',  display: toTitleCase('ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA'),  role: 'Coordenador Municipal de Proteção e Defesa Civil' },
+  { name: 'ASSUERO LOPES DA SILVA',                    display: toTitleCase('ASSUERO LOPES DA SILVA'),                    role: 'Agente de Defesa Civil' },
+  { name: 'CARLOS ROBERTO BARBOSA',                    display: toTitleCase('CARLOS ROBERTO BARBOSA'),                    role: 'Agente de Defesa Civil' },
+  { name: 'EDUARDO WELLINGTON DE ARAUJO',              display: toTitleCase('EDUARDO WELLINGTON DE ARAUJO'),              role: 'Agente de Defesa Civil' },
+  { name: 'GABRIEL FERRACINI',                         display: toTitleCase('GABRIEL FERRACINI'),                         role: 'Agente de Defesa Civil' },
+  { name: 'GILVAN ARAUJO DOS SANTOS',                  display: toTitleCase('GILVAN ARAUJO DOS SANTOS'),                  role: 'Agente de Defesa Civil' },
+  { name: 'HAMILTON MARTINS FIGUEIRA',                 display: toTitleCase('HAMILTON MARTINS FIGUEIRA'),                 role: 'Agente de Defesa Civil' },
+  { name: 'HENRIQUE SCHUNCK COSTA',                    display: toTitleCase('HENRIQUE SCHUNCK COSTA'),                    role: 'Agente Administrativo' },
+  { name: 'ITAMAR JORGE VACARI',                       display: toTitleCase('ITAMAR JORGE VACARI'),                       role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO AZEVEDO',                    display: toTitleCase('JOSE APARECIDO AZEVEDO'),                    role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO BRAZ',                       display: toTitleCase('JOSE APARECIDO BRAZ'),                       role: 'Agente de Defesa Civil' },
+  { name: 'JOSE AUGUSTO SOARES',                       display: toTitleCase('JOSE AUGUSTO SOARES'),                       role: 'Agente de Defesa Civil' },
+  { name: 'JOSE ROBERTO DE SOUZA AMARAL',              display: toTitleCase('JOSE ROBERTO DE SOUZA AMARAL'),              role: 'Agente Administrativo' },
+  { name: 'LUIZ CARLOS TEIXEIRA DOS SANTOS',           display: toTitleCase('LUIZ CARLOS TEIXEIRA DOS SANTOS'),           role: 'Agente de Defesa Civil' },
+  { name: 'MARCIO DE FREITAS SILVESTRE',               display: toTitleCase('MARCIO DE FREITAS SILVESTRE'),               role: 'Agente de Defesa Civil' },
+  { name: 'MARIA LUCIA DE SOUZA ALBARRAZ',             display: toTitleCase('MARIA LUCIA DE SOUZA ALBARRAZ'),             role: 'Auxiliar de Serviços Gerais' },
+  { name: 'MARLENE PEREIRA DA SILVA',                  display: toTitleCase('MARLENE PEREIRA DA SILVA'),                  role: 'Auxiliar de Serviços Gerais' },
+  { name: 'ROGERIO DA SILVA RAMOS',                    display: toTitleCase('ROGERIO DA SILVA RAMOS'),                    role: 'Agente de Defesa Civil' },
+  { name: 'SIDINEI MARQUES BARBOZA',                   display: toTitleCase('SIDINEI MARQUES BARBOZA'),                   role: 'Diretor de Defesa Civil' },
+  { name: 'THEOBALDO LINDOLFO SILVA CARVALHO',         display: toTitleCase('THEOBALDO LINDOLFO SILVA CARVALHO'),         role: 'Agente de Defesa Civil' },
+  { name: 'VALDEIR DE LIMA PEREIRA ALBARRAZ',          display: toTitleCase('VALDEIR DE LIMA PEREIRA ALBARRAZ'),          role: 'Agente de Defesa Civil' },
+  { name: 'VANESSA ALEXANDRE DA SILVA',                display: toTitleCase('VANESSA ALEXANDRE DA SILVA'),                role: 'Auxiliar Administrativo' },
+  { name: 'VINICIUS DIAS CAMPOS',                      display: toTitleCase('VINICIUS DIAS CAMPOS'),                      role: 'Fiscal de Meio Ambiente, Postura e Urbanismo' },
+  { name: 'WILSON ROBERTO DE SOUZA ESPINDOLA',         display: toTitleCase('WILSON ROBERTO DE SOUZA ESPINDOLA'),         role: 'Agente Administrativo' },
+  { name: 'Outro (outra secretaria)',                  display: 'Outro (outra secretaria)',                               role: '' },
 ];
 
 const SECRETARIAS = [
@@ -654,7 +657,7 @@ function StepCabecalho({ ro, onChange }: StepProps) {
             }} className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
               <option value="">Selecione o agente encarregado...</option>
               {AGENTS.map(a => (
-                <option key={a.name} value={a.name}>{a.name}{a.role ? ` — ${a.role}` : ''}</option>
+                <option key={a.name} value={a.name}>{a.display}{a.role ? ` — ${a.role}` : ''}</option>
               ))}
             </select>
           </Field>
@@ -668,13 +671,21 @@ function StepCabecalho({ ro, onChange }: StepProps) {
 
       <Card>
         <SecTitle>Origem da Solicitação</SecTitle>
+        {/* opções sem campo de texto: grid 2 colunas */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          {ORIGINS.filter(o => !o.hasText).map(o => (
+            <Toggle key={o.id} label={o.label} active={ro.origin === o.id}
+              onClick={() => onChange({ origin: ro.origin === o.id ? '' : o.id, originText: '' })} />
+          ))}
+        </div>
+        {/* opções com campo de texto: cada uma em linha própria */}
         <div className="space-y-2">
-          {ORIGINS.map(o => (
+          {ORIGINS.filter(o => o.hasText).map(o => (
             <div key={o.id}>
               <Toggle label={o.label} active={ro.origin === o.id}
                 onClick={() => onChange({ origin: ro.origin === o.id ? '' : o.id, originText: '' })} />
-              {o.hasText && ro.origin === o.id && (
-                <div className="mt-1 ml-4">
+              {ro.origin === o.id && (
+                <div className="mt-1.5 ml-1">
                   <Input value={ro.originText} onChange={v => onChange({ originText: v })}
                     placeholder={o.id === 'procAdm' ? 'Número do processo...' : o.id === 'oficio' ? 'Número do ofício...' : 'Especifique...'} />
                 </div>
@@ -800,6 +811,33 @@ function StepOcorrencia({ ro, onChange }: StepProps) {
 
   return (
     <div className="space-y-4">
+      {/* COBRADE — topo */}
+      <Card>
+        <SecTitle>COBRADE</SecTitle>
+        <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+          Classificação e Codificação Brasileira de Desastres. Preencha somente se a ocorrência se enquadrar como desastre.
+        </p>
+        <Field label="Esta ocorrência é um desastre (COBRADE)?">
+          <div className="flex gap-3 mt-1">
+            {['Sim', 'Não'].map(opt => {
+              const isActive = opt === 'Sim' ? !!ro.cobrade?.active : ro.cobrade?.active === false;
+              return (
+                <button key={opt} type="button"
+                  onClick={() => onChange({ cobrade: { active: opt === 'Sim', code: '', label: '' } })}
+                  className={cn('flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-colors',
+                    isActive ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 text-gray-600 bg-white')}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        {ro.cobrade?.active && (
+          <CobradeSelector cobrade={ro.cobrade} onChange={c => onChange({ cobrade: c })} />
+        )}
+      </Card>
+
+      {/* Tipo de Ocorrência */}
       <Card>
         <SecTitle>Tipo de Ocorrência</SecTitle>
 
@@ -838,19 +876,6 @@ function StepOcorrencia({ ro, onChange }: StepProps) {
                   ))}
                 </div>
               ))}
-              {/* Tipo personalizado */}
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 px-1">Personalizado</p>
-                <button type="button"
-                  onClick={() => {
-                    const lbl = search.trim() || 'Outro';
-                    onChange({ occurrenceTypeId: 'custom', occurrenceTypeLabel: lbl, dynamicFields: {} });
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 active:bg-gray-100 text-left">
-                  <span className="text-xl w-7 text-center">📋</span>
-                  <span className="text-sm text-gray-800">{search ? `Usar "${search}"` : 'Outro tipo...'}</span>
-                </button>
-              </div>
             </div>
           </>
         )}
@@ -872,32 +897,6 @@ function StepOcorrencia({ ro, onChange }: StepProps) {
             ))}
           </div>
         </Field>
-      </Card>
-
-      <Card>
-        <SecTitle>COBRADE</SecTitle>
-        <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
-          Classificação e Codificação Brasileira de Desastres. Preencha somente se a ocorrência se enquadrar como desastre.
-        </p>
-        <Field label="Esta ocorrência é um desastre (COBRADE)?">
-          <div className="flex gap-3 mt-1">
-            {['Sim', 'Não'].map(opt => {
-              const isActive = opt === 'Sim' ? !!ro.cobrade?.active : ro.cobrade?.active === false;
-              return (
-                <button key={opt} type="button"
-                  onClick={() => onChange({ cobrade: { active: opt === 'Sim', code: '', label: '' } })}
-                  className={cn('flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-colors',
-                    isActive ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 text-gray-600 bg-white')}>
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-
-        {ro.cobrade?.active && (
-          <CobradeSelector cobrade={ro.cobrade} onChange={c => onChange({ cobrade: c })} />
-        )}
       </Card>
     </div>
   );
@@ -1120,7 +1119,7 @@ function StepConcluir({ ro, onChange }: StepProps) {
                 {(ro.agentParticipants ?? []).includes(a.name) && <Check size={12} className="text-[#1B3A6B]" />}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold truncate">{a.name}</p>
+                <p className="text-xs font-semibold truncate">{a.display}</p>
                 <p className={cn('text-[11px]', (ro.agentParticipants ?? []).includes(a.name) ? 'text-blue-200' : 'text-gray-400')}>{a.role}</p>
               </div>
             </button>
