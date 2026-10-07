@@ -97,7 +97,7 @@ const COBRADE_LIST: CobradeItem[] = [
   // ── DESASTRES NATURAIS ──
   // Geológico > Terremotos
   { code:'1.1.1.1.0', label:'Tremor de terra',                       group:'Desastres Naturais', subgroup:'Geológico – Terremotos' },
-  { code:'1.1.1.2.0', label:'Terremoto',                             group:'Desastres Naturais', subgroup:'Geológico – Terremotos' },
+  { code:'1.1.1.2.0', label:'Tsunami',                             group:'Desastres Naturais', subgroup:'Geológico – Terremotos' },
   // Geológico > Movimento de Massa
   { code:'1.1.3.1.1', label:'Queda / tombamento de blocos',          group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
   { code:'1.1.3.1.4', label:'Queda / tombamento de lajes',           group:'Desastres Naturais', subgroup:'Geológico – Movimento de Massa' },
