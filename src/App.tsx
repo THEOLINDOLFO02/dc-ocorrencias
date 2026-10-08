@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Camera, ChevronLeft, ChevronRight, Plus, Check,
   Trash2, X, Search, AlertTriangle, FileText, Clock, Printer, Pencil,
-  Moon, Sun, BarChart2, ChevronDown, History,
+  Moon, Sun, BarChart2, ChevronDown, History, Share2, Mail, MessageCircle,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -58,6 +58,7 @@ interface OccurrenceReport {
   reporterName: string;
   rgCpf: string;
   phone: string;
+  reporterEmail: string;
   address: string;
   addressNumber: string;
   neighborhood: string;
@@ -320,7 +321,7 @@ function createNewRO(): OccurrenceReport {
     id: genId(), roNumber: nextRONumber(), emergency: null,
     vehicle: '', date: todayISO(), startTime: nowHHMM(), endTime: '',
     origin: '', originText: '', agent: '', re: '',
-    reporterName: '', rgCpf: '', phone: '', address: '', addressNumber: '', neighborhood: '',
+    reporterName: '', rgCpf: '', phone: '', reporterEmail: '', address: '', addressNumber: '', neighborhood: '',
     occurrenceTypeId: '', occurrenceTypeLabel: '', quadrant: '', riskArea: '',
     dynamicFields: {},
     agencies: DEFAULT_AGENCIES.map(a => ({ ...a })),
@@ -803,6 +804,9 @@ function StepSolicitante({ ro, onChange }: StepProps) {
               <Input type="tel" value={ro.phone} onChange={v => onChange({ phone: v })} placeholder="(11) 90000-0000" />
             </Field>
           </div>
+          <Field label="E-mail">
+            <Input type="email" value={ro.reporterEmail} onChange={v => onChange({ reporterEmail: v })} placeholder="email@exemplo.com" />
+          </Field>
         </div>
       </Card>
 
@@ -1730,7 +1734,75 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
 // VIEW R.O.
 // ─────────────────────────────────────────────
 
+function ShareModal({ ro, onClose }: { ro: OccurrenceReport; onClose: () => void }) {
+  const cleanPhone = (ro.phone ?? '').replace(/\D/g, '');
+  const hasWhatsApp = cleanPhone.length >= 10;
+  const hasEmail = !!(ro.reporterEmail ?? '').trim();
+
+  const summary = [
+    `📋 *R.O. ${ro.roNumber} — Defesa Civil Cajamar*`,
+    `📅 Data: ${fmtDate(ro.date)} | ${ro.startTime}${ro.endTime ? ' – ' + ro.endTime : ''}`,
+    ro.occurrenceTypeLabel ? `🔖 Tipo: ${ro.occurrenceTypeLabel}` : '',
+    ro.address ? `📍 Endereço: ${[ro.address, ro.addressNumber, ro.neighborhood].filter(Boolean).join(', ')}` : '',
+    ro.reporterName ? `👤 Solicitante: ${ro.reporterName}` : '',
+    ro.conclusionStatus ? `✅ Desfecho: ${{ encaminhar: 'Encaminhar', arquivar: 'Arquivar/Finalizado', monitoramento: 'Monitoramento' }[ro.conclusionStatus] ?? ro.conclusionStatus}` : '',
+    ro.conclusion ? `📝 ${ro.conclusion}` : '',
+  ].filter(Boolean).join('\n');
+
+  const sendWhatsApp = () => {
+    const phone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(summary)}`, '_blank');
+  };
+
+  const sendEmail = () => {
+    const subject = encodeURIComponent(`R.O. ${ro.roNumber} — Defesa Civil Cajamar`);
+    const body = encodeURIComponent(summary);
+    window.open(`mailto:${ro.reporterEmail}?subject=${subject}&body=${body}`, '_blank');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-t-3xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
+            <Share2 size={18} className="text-[#1B3A6B]" /> Compartilhar R.O.
+          </h2>
+          <button type="button" onClick={onClose} className="p-1 text-gray-400"><X size={20} /></button>
+        </div>
+        <div className="space-y-3">
+          {hasWhatsApp ? (
+            <button type="button" onClick={sendWhatsApp}
+              className="w-full py-4 rounded-2xl bg-green-500 text-white font-bold text-sm flex items-center justify-center gap-3 active:opacity-80">
+              <MessageCircle size={20} /> Enviar por WhatsApp
+              <span className="text-xs font-normal opacity-80">{ro.phone}</span>
+            </button>
+          ) : (
+            <div className="w-full py-4 rounded-2xl bg-gray-100 text-gray-400 text-sm flex items-center justify-center gap-2">
+              <MessageCircle size={18} /> WhatsApp — telefone não informado
+            </div>
+          )}
+          {hasEmail ? (
+            <button type="button" onClick={sendEmail}
+              className="w-full py-4 rounded-2xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-3 active:opacity-80">
+              <Mail size={20} /> Enviar por E-mail
+              <span className="text-xs font-normal opacity-80">{ro.reporterEmail}</span>
+            </button>
+          ) : (
+            <div className="w-full py-4 rounded-2xl bg-gray-100 text-gray-400 text-sm flex items-center justify-center gap-2">
+              <Mail size={18} /> E-mail — não informado
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-gray-400 text-center mt-4">
+          {hasWhatsApp || hasEmail ? 'Selecione como deseja enviar o resumo do R.O.' : 'Preencha telefone ou e-mail do solicitante para compartilhar.'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; onBack: () => void; onPrint: () => void; onEdit: () => void }) {
+  const [showShare, setShowShare] = useState(false);
   const type = OCCURRENCE_TYPES.find(t => t.id === ro.occurrenceTypeId);
 
   const Sec = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -1790,6 +1862,7 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
           <Row label="Nome"      value={ro.reporterName} />
           <Row label="RG/CPF"   value={ro.rgCpf} />
           <Row label="Telefone" value={ro.phone} />
+          <Row label="E-mail"   value={ro.reporterEmail} />
           <Row label="Endereço" value={[ro.address, ro.addressNumber].filter(Boolean).join(', ')} />
           <Row label="Bairro"   value={ro.neighborhood} />
         </Sec>
@@ -1890,11 +1963,16 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
             className="flex-1 py-4 rounded-2xl bg-[#1B3A6B] text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80">
             <Pencil size={18} /> Editar
           </button>
+          <button type="button" onClick={() => setShowShare(true)}
+            className="flex-1 py-4 rounded-2xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80">
+            <Share2 size={18} /> Compartilhar
+          </button>
           <button type="button" onClick={onPrint}
             className="flex-1 py-4 rounded-2xl border-2 border-[#1B3A6B] text-[#1B3A6B] font-bold text-sm flex items-center justify-center gap-2 active:bg-blue-50">
             <Printer size={18} /> Imprimir
           </button>
         </div>
+        {showShare && <ShareModal ro={ro} onClose={() => setShowShare(false)} />}
       </div>
     </div>
   );
