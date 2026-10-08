@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* ── Tema escuro ── */
+:root {
+  --bg-app:    #f3f4f6;
+  --bg-card:   #ffffff;
+  --bg-header: #1B3A6B;
+  --text-main: #111827;
+  --text-muted:#6b7280;
+  --border:    #e5e7eb;
+}
+
+[data-theme="dark"] {
+  --bg-app:    #0f172a;
+  --bg-card:   #1e293b;
+  --bg-header: #0f1f3d;
+  --text-main: #f1f5f9;
+  --text-muted:#94a3b8;
+  --border:    #334155;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* ── Print ── */
 @media print {
   .no-print { display: none !important; }
   .print-page-break { page-break-before: always; break-before: page; }
