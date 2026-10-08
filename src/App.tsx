@@ -805,7 +805,7 @@ function StepSolicitante({ ro, onChange }: StepProps) {
             </Field>
           </div>
           <Field label="E-mail">
-            <Input type="email" value={ro.reporterEmail} onChange={v => onChange({ reporterEmail: v })} placeholder="email@exemplo.com" />
+            <Input type="email" value={ro.reporterEmail ?? ''} onChange={v => onChange({ reporterEmail: v })} placeholder="email@exemplo.com" />
           </Field>
         </div>
       </Card>
