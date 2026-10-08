@@ -229,35 +229,36 @@ const ORIGINS = [
 const toTitleCase = (s: string) =>
   s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
-const AGENTS: { name: string; display: string; role: string }[] = [
-  { name: 'AMERICO FERREIRA SOARES',                   display: toTitleCase('AMERICO FERREIRA SOARES'),                   role: 'Agente de Defesa Civil' },
-  { name: 'ANDREA DE OLIVEIRA SOUSA',                  display: toTitleCase('ANDREA DE OLIVEIRA SOUSA'),                  role: 'Agente de Defesa Civil' },
-  { name: 'ANGELA MARIA MACIEL GONCALVES BARBOSA',     display: toTitleCase('ANGELA MARIA MACIEL GONCALVES BARBOSA'),     role: 'Agente de Defesa Civil' },
-  { name: 'ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA',  display: toTitleCase('ANTONIO CARLOS GALEOTI DE FREITAS ARRUDA'),  role: 'Coordenador Municipal de Proteção e Defesa Civil' },
-  { name: 'ASSUERO LOPES DA SILVA',                    display: toTitleCase('ASSUERO LOPES DA SILVA'),                    role: 'Agente de Defesa Civil' },
-  { name: 'CARLOS ROBERTO BARBOSA',                    display: toTitleCase('CARLOS ROBERTO BARBOSA'),                    role: 'Agente de Defesa Civil' },
-  { name: 'EDUARDO WELLINGTON DE ARAUJO',              display: toTitleCase('EDUARDO WELLINGTON DE ARAUJO'),              role: 'Agente de Defesa Civil' },
-  { name: 'GABRIEL FERRACINI',                         display: toTitleCase('GABRIEL FERRACINI'),                         role: 'Agente de Defesa Civil' },
-  { name: 'GILVAN ARAUJO DOS SANTOS',                  display: toTitleCase('GILVAN ARAUJO DOS SANTOS'),                  role: 'Agente de Defesa Civil' },
-  { name: 'HAMILTON MARTINS FIGUEIRA',                 display: toTitleCase('HAMILTON MARTINS FIGUEIRA'),                 role: 'Agente de Defesa Civil' },
-  { name: 'HENRIQUE SCHUNCK COSTA',                    display: toTitleCase('HENRIQUE SCHUNCK COSTA'),                    role: 'Agente Administrativo' },
-  { name: 'ITAMAR JORGE VACARI',                       display: toTitleCase('ITAMAR JORGE VACARI'),                       role: 'Agente de Defesa Civil' },
-  { name: 'JOSE APARECIDO AZEVEDO',                    display: toTitleCase('JOSE APARECIDO AZEVEDO'),                    role: 'Agente de Defesa Civil' },
-  { name: 'JOSE APARECIDO BRAZ',                       display: toTitleCase('JOSE APARECIDO BRAZ'),                       role: 'Agente de Defesa Civil' },
-  { name: 'JOSE AUGUSTO SOARES',                       display: toTitleCase('JOSE AUGUSTO SOARES'),                       role: 'Agente de Defesa Civil' },
-  { name: 'JOSE ROBERTO DE SOUZA AMARAL',              display: toTitleCase('JOSE ROBERTO DE SOUZA AMARAL'),              role: 'Agente Administrativo' },
-  { name: 'LUIZ CARLOS TEIXEIRA DOS SANTOS',           display: toTitleCase('LUIZ CARLOS TEIXEIRA DOS SANTOS'),           role: 'Agente de Defesa Civil' },
-  { name: 'MARCIO DE FREITAS SILVESTRE',               display: toTitleCase('MARCIO DE FREITAS SILVESTRE'),               role: 'Agente de Defesa Civil' },
-  { name: 'MARIA LUCIA DE SOUZA ALBARRAZ',             display: toTitleCase('MARIA LUCIA DE SOUZA ALBARRAZ'),             role: 'Auxiliar de Serviços Gerais' },
-  { name: 'MARLENE PEREIRA DA SILVA',                  display: toTitleCase('MARLENE PEREIRA DA SILVA'),                  role: 'Auxiliar de Serviços Gerais' },
-  { name: 'ROGERIO DA SILVA RAMOS',                    display: toTitleCase('ROGERIO DA SILVA RAMOS'),                    role: 'Agente de Defesa Civil' },
-  { name: 'SIDINEI MARQUES BARBOZA',                   display: toTitleCase('SIDINEI MARQUES BARBOZA'),                   role: 'Diretor de Defesa Civil' },
-  { name: 'THEOBALDO LINDOLFO SILVA CARVALHO',         display: toTitleCase('THEOBALDO LINDOLFO SILVA CARVALHO'),         role: 'Agente de Defesa Civil' },
-  { name: 'VALDEIR DE LIMA PEREIRA ALBARRAZ',          display: toTitleCase('VALDEIR DE LIMA PEREIRA ALBARRAZ'),          role: 'Agente de Defesa Civil' },
-  { name: 'VANESSA ALEXANDRE DA SILVA',                display: toTitleCase('VANESSA ALEXANDRE DA SILVA'),                role: 'Auxiliar Administrativo' },
-  { name: 'VINICIUS DIAS CAMPOS',                      display: toTitleCase('VINICIUS DIAS CAMPOS'),                      role: 'Fiscal de Meio Ambiente, Postura e Urbanismo' },
-  { name: 'WILSON ROBERTO DE SOUZA ESPINDOLA',         display: toTitleCase('WILSON ROBERTO DE SOUZA ESPINDOLA'),         role: 'Agente Administrativo' },
-  { name: 'Outro (outra secretaria)',                  display: 'Outro (outra secretaria)',                               role: '' },
+interface Agent { name: string; display: string; re: string; role: string; }
+const AGENTS: Agent[] = [
+  { name: 'AMERICO FERREIRA SOARES',               display: 'Américo Ferreira Soares',               re: '13606', role: 'Agente de Defesa Civil' },
+  { name: 'ANDREA DE OLIVEIRA SOUZA',              display: 'Andrea de Oliveira Souza',              re: '20264', role: 'Agente de Defesa Civil' },
+  { name: 'ANGELA MARIA MACIEL GONCALVES BARBOSA', display: 'Ângela Maria Maciel G. Barbosa',        re: '11381', role: 'Agente de Defesa Civil' },
+  { name: 'ANTONIO CARLOS GALEOTI FREITAS ARRUDA', display: 'Antonio Carlos G. de Freitas Arruda',   re: '8769',  role: 'Coordenador de Defesa Civil' },
+  { name: 'ASSUERO LOPES DA SILVA',                display: 'Assuero Lopes da Silva',                re: '13608', role: 'Agente de Defesa Civil' },
+  { name: 'CARLOS ROBERTO BARBOSA',                display: 'Carlos Roberto Barbosa',                re: '11332', role: 'Agente de Defesa Civil' },
+  { name: 'DAYANE RANGEL RAMOS PEREIRA',           display: 'Dayane Rangel Ramos Pereira',           re: '20607', role: 'Articulador de Políticas Públicas' },
+  { name: 'EDUARDO LEMOS',                         display: 'Eduardo Lemos',                         re: '13609', role: 'Agente de Defesa Civil' },
+  { name: 'GABRIEL FERRACINI',                     display: 'Gabriel Ferracini',                     re: '20242', role: 'Agente de Defesa Civil' },
+  { name: 'GILVAN ARAUJO SANTOS',                  display: 'Gilvan Araujo Santos',                  re: '20235', role: 'Agente de Defesa Civil' },
+  { name: 'HAMILTON MARTINS FIGUEIRA',             display: 'Hamilton Martins Figueira',             re: '20246', role: 'Agente de Defesa Civil' },
+  { name: 'HENRIQUE SCHUNK COSTA',                 display: 'Henrique Schunk Costa',                 re: '18560', role: 'Agente Administrativo' },
+  { name: 'ITAMAR JORGE VACARI',                   display: 'Itamar Jorge Vacari',                   re: '11385', role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO AZEVEDO',                display: 'José Aparecido Azevedo',                re: '13611', role: 'Agente de Defesa Civil' },
+  { name: 'JOSE APARECIDO BRAZ',                   display: 'José Aparecido Braz',                   re: '11339', role: 'Agente de Defesa Civil' },
+  { name: 'JOSE AUGUSTO SOARES',                   display: 'José Augusto Soares',                   re: '11340', role: 'Agente de Defesa Civil' },
+  { name: 'JOSE ROBERTO DE SOUZA AMARAL',          display: 'José Roberto de Souza Amaral',          re: '12643', role: 'Agente Administrativo' },
+  { name: 'LUIZ CARLOS TEIXEIRA DOS SANTOS',       display: 'Luiz Carlos Teixeira dos Santos',       re: '13614', role: 'Agente de Defesa Civil' },
+  { name: 'MARCIO DE FREITAS SILVESTRE',           display: 'Marcio de Freitas Silvestre',           re: '13615', role: 'Agente de Defesa Civil' },
+  { name: 'MARIA LUCIA DE SOUZA ALBARRAZ',         display: 'Maria Lucia de Souza Albarraz',         re: '12546', role: 'Auxiliar de Serviços Gerais' },
+  { name: 'MARLENE PEREIRA DA SILVA BARBOSA',      display: 'Marlene Pereira da Silva Barbosa',      re: '10342', role: 'Auxiliar de Serviços Gerais' },
+  { name: 'ROGERIO DA SILVA RAMOS',                display: 'Rogério da Silva Ramos',                re: '13633', role: 'Agente de Defesa Civil' },
+  { name: 'SIDINEI MARQUES BARBOZA',               display: 'Sidinei Marques Barboza',               re: '18768', role: 'Diretor de Defesa Civil' },
+  { name: 'THEOBALDO LINDOLFO SILVA CARVALHO',     display: 'Theobaldo Lindolfo S. Carvalho',        re: '20236', role: 'Agente de Defesa Civil' },
+  { name: 'VALDEIR DE LIMA PEREIRA ALBARRAZ',      display: 'Valdeir de Lima Pereira Albarraz',      re: '20606', role: 'Agente de Defesa Civil' },
+  { name: 'VANESSA ALEXANDRE DA SILVA',            display: 'Vanessa Alexandre da Silva',            re: '10325', role: 'Auxiliar Administrativo' },
+  { name: 'WILSON ROBERTO DE SOUZA ESPINDOLA',     display: 'Wilson Roberto de Souza Espindola',     re: '13020', role: 'Agente Administrativo' },
+  { name: 'OUTRO',                                 display: 'Outro (outra secretaria)',               re: '',      role: '' },
 ];
 
 const SECRETARIAS = [
@@ -599,6 +600,103 @@ function FireSection({ fields, onChange }: DSProps) {
 }
 
 // ─────────────────────────────────────────────
+// AGENT PICKER — modal de busca
+// ─────────────────────────────────────────────
+
+function AgentPicker({ value, onChange }: { value: string; onChange: (name: string, re: string, role: string) => void }) {
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState('');
+
+  const selected = AGENTS.find(a => a.name === value);
+  const q = query.trim().toLowerCase();
+  const filtered = AGENTS.filter(a =>
+    !q ||
+    a.display.toLowerCase().includes(q) ||
+    a.re.includes(q) ||
+    a.role.toLowerCase().includes(q)
+  );
+
+  const pick = (a: Agent) => {
+    onChange(a.name, a.re, a.role);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <>
+      {/* Botão de seleção */}
+      <button type="button" onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-3 border border-gray-300 rounded-xl px-4 py-3 bg-white text-left focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+        {selected ? (
+          <>
+            <div className="w-9 h-9 rounded-full bg-[#1B3A6B] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {selected.display.split(' ').slice(0, 2).map(w => w[0]).join('')}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">{selected.display}</p>
+              <p className="text-xs text-gray-500">{selected.role}{selected.re ? ` · RE ${selected.re}` : ''}</p>
+            </div>
+            <button type="button" onClick={e => { e.stopPropagation(); onChange('', '', ''); }}
+              className="p-1 text-gray-400 hover:text-red-400 flex-shrink-0">
+              <X size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <Search size={16} className="text-gray-400 flex-shrink-0" />
+            <span className="text-sm text-gray-400">Selecionar agente encarregado...</span>
+            <ChevronRight size={16} className="text-gray-300 ml-auto flex-shrink-0" />
+          </>
+        )}
+      </button>
+
+      {/* Modal */}
+      {open && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white">
+          {/* Header do modal */}
+          <div className="bg-[#1B3A6B] text-white px-4 pt-12 pb-3 flex-shrink-0">
+            <div className="flex items-center gap-3 mb-3">
+              <button type="button" onClick={() => { setOpen(false); setQuery(''); }} className="p-1 -ml-1">
+                <ChevronLeft size={24} />
+              </button>
+              <p className="font-bold text-base">Agente Encarregado</p>
+            </div>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 pointer-events-none" />
+              <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+                placeholder="Buscar por nome, RE ou cargo..."
+                className="w-full bg-white/15 text-white placeholder-blue-300 rounded-xl pl-9 pr-4 py-2.5 text-sm border border-white/20 focus:outline-none" />
+            </div>
+          </div>
+
+          {/* Lista */}
+          <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+            {filtered.length === 0 && (
+              <div className="text-center py-16 text-gray-400 text-sm">Nenhum agente encontrado</div>
+            )}
+            {filtered.map(a => (
+              <button key={a.name} type="button" onClick={() => pick(a)}
+                className={cn('w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors',
+                  value === a.name ? 'bg-blue-50' : 'bg-white active:bg-gray-50')}>
+                <div className={cn('w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0',
+                  a.name === 'OUTRO' ? 'bg-gray-100 text-gray-500' : value === a.name ? 'bg-[#1B3A6B] text-white' : 'bg-blue-100 text-[#1B3A6B]')}>
+                  {a.name === 'OUTRO' ? '＋' : a.display.split(' ').slice(0, 2).map(w => w[0]).join('')}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{a.display}</p>
+                  <p className="text-xs text-gray-500">{a.role}{a.re ? ` · RE ${a.re}` : ''}</p>
+                </div>
+                {value === a.name && <Check size={18} className="text-[#1B3A6B] flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
 // WIZARD STEPS
 // ─────────────────────────────────────────────
 
@@ -651,21 +749,8 @@ function StepCabecalho({ ro, onChange }: StepProps) {
             </select>
           </Field>
           <Field label="Agente Encarregado" required>
-            <select value={ro.agent} onChange={e => {
-              const ag = AGENTS.find(a => a.name === e.target.value);
-              onChange({ agent: e.target.value, role: ag?.role ?? '' });
-            }} className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
-              <option value="">Selecione o agente encarregado...</option>
-              {AGENTS.map(a => (
-                <option key={a.name} value={a.name}>{a.display}{a.role ? ` — ${a.role}` : ''}</option>
-              ))}
-            </select>
+            <AgentPicker value={ro.agent} onChange={(name, re, role) => onChange({ agent: name, re, role })} />
           </Field>
-          {ro.agent && (
-            <div className="bg-blue-50 rounded-xl px-4 py-2 text-xs text-blue-700">
-              <span className="font-semibold">Cargo:</span> {ro.role || '—'}
-            </div>
-          )}
         </div>
       </Card>
 
