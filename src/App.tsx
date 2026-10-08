@@ -80,7 +80,7 @@ interface OccurrenceReport {
   relatedDocs: string;
   cobrade: { active: boolean; code: string; label: string };
   conclusion: string;
-  conclusionStatus: 'encaminhar' | 'arquivar' | 'pendente' | 'monitoramento' | '';
+  conclusionStatus: 'encaminhar' | 'arquivar' | 'monitoramento' | '';
   encaminharDest: string[];
   status: 'draft' | 'completed';
   createdAt: string;
@@ -1159,10 +1159,9 @@ function StepConcluir({ ro, onChange }: StepProps) {
   };
 
   const statusConfig = [
-    { id: 'encaminhar',    label: 'Encaminhar',         color: 'bg-blue-100 text-blue-700 border-blue-300',   activeColor: 'bg-blue-500 text-white border-blue-600' },
+    { id: 'encaminhar',    label: 'Encaminhar',            color: 'bg-blue-100 text-blue-700 border-blue-300',   activeColor: 'bg-blue-500 text-white border-blue-600' },
     { id: 'arquivar',      label: 'Arquivar / Finalizado', color: 'bg-green-100 text-green-700 border-green-300', activeColor: 'bg-green-500 text-white border-green-600' },
-    { id: 'pendente',      label: 'Pendente',            color: 'bg-yellow-100 text-yellow-700 border-yellow-300', activeColor: 'bg-yellow-400 text-white border-yellow-500' },
-    { id: 'monitoramento', label: 'Monitoramento',       color: 'bg-orange-100 text-orange-700 border-orange-300', activeColor: 'bg-orange-500 text-white border-orange-600' },
+    { id: 'monitoramento', label: 'Monitoramento',         color: 'bg-orange-100 text-orange-700 border-orange-300', activeColor: 'bg-orange-500 text-white border-orange-600' },
   ] as const;
 
   return (
@@ -2197,7 +2196,12 @@ export default function App() {
 
   const handleSave = useCallback(() => {
     if (!currentRO) return;
-    const saved = { ...currentRO, status: 'completed' as const, updatedAt: new Date().toISOString() };
+    const saved = {
+      ...currentRO,
+      endTime: currentRO.endTime || nowHHMM(),
+      status: 'completed' as const,
+      updatedAt: new Date().toISOString(),
+    };
     const idx = ros.findIndex(r => r.id === saved.id);
     persist(idx >= 0 ? ros.map((r, i) => i === idx ? saved : r) : [...ros, saved]);
     setCurrentRO(saved);
