@@ -20,6 +20,8 @@ interface Photo {
   id: string;
   dataUrl: string;
   caption: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface Agency {
@@ -302,7 +304,9 @@ function genId() {
 
 function nextRONumber() {
   const yy = new Date().getFullYear().toString().slice(-2);
-  const n = parseInt(localStorage.getItem('dc_ro_counter') || '0') + 1;
+  const storedYear = localStorage.getItem('dc_ro_year');
+  const n = storedYear === yy ? parseInt(localStorage.getItem('dc_ro_counter') || '0') + 1 : 1;
+  localStorage.setItem('dc_ro_year', yy);
   localStorage.setItem('dc_ro_counter', String(n));
   return `${n}/${yy}`;
 }
@@ -1083,20 +1087,35 @@ function StepApoio({ ro, onChange }: StepProps) {
   );
 }
 
+function getGPS(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null),
+      { timeout: 5000, maximumAge: 30000 }
+    );
+  });
+}
+
 function StepFotos({ ro, onChange }: StepProps) {
   const inputRef   = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean) => {
     const files = e.target.files;
     if (!files) return;
+    const gps = fromCamera ? await getGPS() : null;
     const newPhotos: Photo[] = [];
     for (const file of Array.from(files)) {
       const dataUrl = await compressImage(file);
-      newPhotos.push({ id: genId(), dataUrl, caption: `Foto ${ro.photos.length + newPhotos.length + 1} – ` });
+      const photo: Photo = { id: genId(), dataUrl, caption: `Foto ${ro.photos.length + newPhotos.length + 1} – ` };
+      if (gps) { photo.lat = gps.lat; photo.lng = gps.lng; }
+      newPhotos.push(photo);
     }
     onChange({ photos: [...ro.photos, ...newPhotos] });
     if (inputRef.current) inputRef.current.value = '';
+    if (galleryRef.current) galleryRef.current.value = '';
   };
 
   return (
@@ -1111,10 +1130,10 @@ function StepFotos({ ro, onChange }: StepProps) {
         <SecTitle>Fotos ({ro.photos.length})</SecTitle>
         {/* Câmera */}
         <input ref={inputRef} type="file" accept="image/*" capture="environment" multiple
-          onChange={handleFiles} className="hidden" />
+          onChange={e => handleFiles(e, true)} className="hidden" />
         {/* Galeria */}
         <input ref={galleryRef} type="file" accept="image/*" multiple
-          onChange={handleFiles} className="hidden" />
+          onChange={e => handleFiles(e, false)} className="hidden" />
         <div className="flex gap-2 mb-3">
           <button type="button" onClick={() => inputRef.current?.click()}
             className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-[#1B3A6B] hover:text-[#1B3A6B] transition-colors">
@@ -1143,6 +1162,11 @@ function StepFotos({ ro, onChange }: StepProps) {
                 onChange={e => onChange({ photos: ro.photos.map(p => p.id === photo.id ? { ...p, caption: e.target.value } : p) })}
                 placeholder={`Foto ${idx + 1} – Legenda...`}
                 className="mt-2 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+              {photo.lat != null && (
+                <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1">
+                  📍 {photo.lat.toFixed(6)}, {photo.lng!.toFixed(6)}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -2398,6 +2422,9 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                               style={{ maxHeight: '160px' }} />
                             <div className="text-center text-[9px] mt-1 font-medium text-gray-700">
                               {photo.caption}
+                              {photo.lat != null && (
+                                <span className="block text-gray-400">GPS: {photo.lat.toFixed(5)}, {photo.lng!.toFixed(5)}</span>
+                              )}
                             </div>
                           </>
                         ) : null}
@@ -2429,6 +2456,16 @@ export default function App() {
   });
   const [currentRO, setCurrentRO] = useState<OccurrenceReport | null>(null);
   const editMode = useRef(false);
+
+  // ── Offline ──
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const on  = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online',  on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
   // ── Tema escuro ──
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -2500,15 +2537,21 @@ export default function App() {
     persist([]);
   };
 
+  const offlineBanner = !isOnline && (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-xs font-bold text-center py-1.5 no-print">
+      ⚠️ Sem conexão — dados salvos localmente
+    </div>
+  );
+
   if (screen === 'wizard' && currentRO)
-    return <WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} />;
+    return <>{offlineBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
 
   if (screen === 'print' && currentRO)
     return <PrintScreen ro={currentRO} onClose={() => setScreen('view')} />;
 
   if (screen === 'view' && currentRO)
-    return <ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} />;
+    return <>{offlineBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} /></>;
 
-  return <HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll}
-    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} />;
+  return <>{offlineBanner}<HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll}
+    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} /></>;
 }
