@@ -905,6 +905,71 @@ function StepCabecalho({ ro, onChange }: StepProps) {
   );
 }
 
+interface NominatimResult {
+  display_name: string;
+  address: {
+    road?: string; pedestrian?: string; path?: string;
+    suburb?: string; neighbourhood?: string; quarter?: string;
+    house_number?: string;
+  };
+}
+
+function AddressAutocomplete({ value, onChange, onSelect }: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (road: string, number: string, suburb: string) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggestions = (q: string) => {
+    if (q.length < 4) { setSuggestions([]); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Cajamar, SP')}&format=json&addressdetails=1&limit=5&countrycodes=br`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+      } catch { setSuggestions([]); }
+      finally { setLoading(false); }
+    }, 500);
+  };
+
+  const pick = (r: NominatimResult) => {
+    const road = r.address.road ?? r.address.pedestrian ?? r.address.path ?? '';
+    const number = r.address.house_number ?? '';
+    const suburb = r.address.suburb ?? r.address.neighbourhood ?? r.address.quarter ?? '';
+    onSelect(road, number, suburb);
+    setSuggestions([]);
+  };
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input value={value} onChange={e => { onChange(e.target.value); fetchSuggestions(e.target.value); }}
+          placeholder="Rua, Av., Estrada..."
+          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+        {loading && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>
+        )}
+      </div>
+      {suggestions.length > 0 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {suggestions.map((r, i) => (
+            <button key={i} type="button" onClick={() => pick(r)}
+              className="w-full px-4 py-3 text-left text-xs text-gray-700 border-b border-gray-100 last:border-0 active:bg-gray-50 leading-tight">
+              {r.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepSolicitante({ ro, onChange }: StepProps) {
   return (
     <div className="space-y-4">
@@ -932,7 +997,15 @@ function StepSolicitante({ ro, onChange }: StepProps) {
         <SecTitle>Endereço da Ocorrência</SecTitle>
         <div className="space-y-3">
           <Field label="Logradouro" required>
-            <Input value={ro.address} onChange={v => onChange({ address: v })} placeholder="Rua, Av., Estrada..." />
+            <AddressAutocomplete
+              value={ro.address}
+              onChange={v => onChange({ address: v })}
+              onSelect={(road, number, suburb) => onChange({
+                address: road,
+                addressNumber: number || ro.addressNumber,
+                neighborhood: suburb || ro.neighborhood,
+              })}
+            />
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Nº">
@@ -1446,6 +1519,16 @@ function SignaturePad({ value, onChange }: { value: string; onChange: (v: string
 // WIZARD
 // ─────────────────────────────────────────────
 
+interface ValidationError { message: string; step: WizardStep; }
+
+function validateRO(ro: OccurrenceReport): ValidationError | null {
+  if (!ro.agent)             return { message: 'Informe o Agente Encarregado.',     step: 1 };
+  if (!ro.address)           return { message: 'Informe o endereço da ocorrência.', step: 2 };
+  if (!ro.neighborhood)      return { message: 'Informe o bairro da ocorrência.',   step: 2 };
+  if (!ro.occurrenceTypeId)  return { message: 'Selecione o tipo de ocorrência.',   step: 3 };
+  return null;
+}
+
 function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
   ro: OccurrenceReport;
   onUpdate: (u: Partial<OccurrenceReport>) => void;
@@ -1454,11 +1537,14 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
 }) {
   const [step, setStep] = useState<WizardStep>(1);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [validationError, setValidationError] = useState<ValidationError | null>(null);
   const TOTAL = 7;
 
   const goNext = () => {
-    if (step < TOTAL) { setStep((step + 1) as WizardStep); window.scrollTo(0, 0); }
-    else onSave();
+    if (step < TOTAL) { setStep((step + 1) as WizardStep); window.scrollTo(0, 0); return; }
+    const err = validateRO(ro);
+    if (err) { setValidationError(err); return; }
+    onSave();
   };
   const goBack = () => {
     if (step > 1) { setStep((step - 1) as WizardStep); window.scrollTo(0, 0); }
@@ -1509,6 +1595,26 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
             : <>Continuar <ChevronRight size={18} /></>}
         </button>
       </div>
+
+      {/* Modal — erro de validação */}
+      {validationError && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-500" />
+              </div>
+              <p className="font-bold text-gray-800 text-base">Campo obrigatório</p>
+            </div>
+            <p className="text-sm text-gray-500 mb-5">{validationError.message}</p>
+            <button type="button"
+              onClick={() => { setStep(validationError.step); setValidationError(null); window.scrollTo(0, 0); }}
+              className="w-full py-3 rounded-xl bg-[#1B3A6B] text-white font-bold text-sm">
+              Ir para a etapa {validationError.step}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal — confirmação de saída */}
       {confirmLeave && (
