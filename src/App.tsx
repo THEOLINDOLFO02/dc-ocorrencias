@@ -2474,7 +2474,7 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             {/* ─ Agente ─ */}
             <tr>
               <TCell colSpan={2}>
-                <TLabel>Preenchido Por</TLabel>
+                <TLabel>Agente Encarregado</TLabel>
                 <TValue>{ro.agent}</TValue>
                 {ro.role && <TValue className="text-gray-500 text-[9px]">{ro.role}</TValue>}
               </TCell>
@@ -2553,6 +2553,7 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                     ? (ro.agentParticipants ?? []).map(n => <span key={n} className="font-medium">{n}</span>)
                     : <span className="text-gray-400">—</span>}
                 </div>
+                <div className="mt-3 border-t border-gray-400 text-[9px] text-gray-500">Assinaturas dos agentes</div>
               </TCell>
             </tr>
 
