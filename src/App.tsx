@@ -18,7 +18,7 @@ import {
 // TYPES
 // ─────────────────────────────────────────────
 
-type Screen = 'home' | 'wizard' | 'view' | 'print';
+type Screen = 'home' | 'wizard' | 'view' | 'print' | 'pin';
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 type SectionType = 'trees' | 'structural' | 'bees' | 'animals' | 'geological' | 'hydrological' | 'fire' | 'generic';
 
@@ -85,6 +85,7 @@ interface OccurrenceReport {
   declarant1Role: string;
   declarant1Sig: string;
   agentParticipants: string[];
+  agentLocked: boolean;
   filledBy: string;
   role: string;
   relatedDocs: string;
@@ -341,7 +342,7 @@ function createNewRO(roNumber: string): OccurrenceReport {
     losses: { furniture: false, food: false, clothes: false, documents: false, property: false, others: false, othersDesc: '', victims: '', injured: '', deaths: '' },
     photoScenario: '', photos: [], photoConclusion: '',
     observations: '', declarant1: '', declarant1Role: '', declarant1Sig: '',
-    agentParticipants: [], filledBy: '', role: '', relatedDocs: '',
+    agentParticipants: [], agentLocked: false, filledBy: '', role: '', relatedDocs: '',
     cobrade: { active: false, code: '', label: '' }, conclusion: '',
     conclusionStatus: '' as const, encaminharDest: [],
     status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -661,7 +662,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (name: stri
         ) : (
           <>
             <Search size={16} className="text-gray-400 flex-shrink-0" />
-            <span className="text-sm text-gray-400">Selecionar agente encarregado...</span>
+            <span className="text-sm text-gray-400">Selecionar responsável pelo preenchimento...</span>
             <ChevronRight size={16} className="text-gray-300 ml-auto flex-shrink-0" />
           </>
         )}
@@ -882,9 +883,25 @@ function StepCabecalho({ ro, onChange }: StepProps) {
 
       <Card>
         <SecTitle>Preenchido Por</SecTitle>
-        <Field label="Responsável pelo preenchimento" required>
-          <AgentPicker value={ro.agent} onChange={(name, re, role) => onChange({ agent: name, re, role })} />
-        </Field>
+        {ro.agentLocked ? (
+          <div className="flex items-center gap-3 px-1 py-2">
+            <div className="w-9 h-9 rounded-full bg-[#1B3A6B] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+              {(AGENTS.find(a => a.name === ro.agent)?.display ?? ro.agent).charAt(0)}
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-[var(--text-main)]">
+                {AGENTS.find(a => a.name === ro.agent)?.display ?? ro.agent}
+              </p>
+              {ro.role && <p className="text-xs text-[var(--text-muted)]">{ro.role}</p>}
+              {ro.re && <p className="text-xs text-[var(--text-muted)]">RE: {ro.re}</p>}
+            </div>
+            <span className="ml-auto text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">🔒 Identificado</span>
+          </div>
+        ) : (
+          <Field label="Responsável pelo preenchimento" required>
+            <AgentPicker value={ro.agent} onChange={(name, re, role) => onChange({ agent: name, re, role })} />
+          </Field>
+        )}
       </Card>
 
       <Card>
@@ -2516,6 +2533,29 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
               </TCell>
             </tr>
 
+            {/* ─ Assinaturas ─ */}
+            <tr className="border-t-2 border-gray-700 bg-gray-50">
+              <TCell colSpan={3}><span className="font-black text-[10px]">ASSINATURAS</span></TCell>
+            </tr>
+            <tr>
+              <TCell>
+                <TLabel>Declarante</TLabel>
+                <TValue>{ro.declarant1}</TValue>
+                {ro.declarant1Role && <TValue className="text-gray-500 text-[9px]">{ro.declarant1Role}</TValue>}
+                {ro.declarant1Sig
+                  ? <img src={ro.declarant1Sig} alt="assinatura" className="mt-2 h-10 object-contain" />
+                  : <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
+              </TCell>
+              <TCell colSpan={2}>
+                <TLabel>Agentes Participantes</TLabel>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] mt-0.5">
+                  {(ro.agentParticipants ?? []).length > 0
+                    ? (ro.agentParticipants ?? []).map(n => <span key={n} className="font-medium">{n}</span>)
+                    : <span className="text-gray-400">—</span>}
+                </div>
+              </TCell>
+            </tr>
+
             {/* ─ Desfecho ─ */}
             <tr className="border-t border-gray-500 bg-gray-50">
               <TCell colSpan={3}>
@@ -2705,6 +2745,65 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 }
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PIN SCREEN — identificação do agente pelo RE
+// ─────────────────────────────────────────────
+
+function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void; onCancel: () => void }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+
+  const handleConfirm = () => {
+    const found = AGENTS.find(a => a.re === pin.trim());
+    if (!found || found.name === 'OUTRO') {
+      setError('RE não encontrado. Tente novamente.');
+      setPin('');
+      return;
+    }
+    onConfirm(found);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-5">
+        <div className="text-center">
+          <div className="text-3xl mb-1">🔶</div>
+          <h2 className="text-lg font-black text-[#1B3A6B]">Identificação</h2>
+          <p className="text-sm text-gray-500 mt-1">Digite seu número de RE para preencher o R.O.</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Número de RE</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={pin}
+            onChange={e => { setPin(e.target.value); setError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+            placeholder="Ex.: 20236"
+            autoFocus
+            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-lg text-center font-mono tracking-widest focus:outline-none focus:border-[#1B3A6B]"
+          />
+          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
+        </div>
+
+        <button
+          onClick={handleConfirm}
+          className="w-full bg-[#1B3A6B] text-white font-bold py-3 rounded-xl text-sm active:opacity-80"
+        >
+          Confirmar
+        </button>
+        <button
+          onClick={onCancel}
+          className="w-full text-gray-500 text-sm py-1 active:opacity-60"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ROOT APP
 // ─────────────────────────────────────────────
 
@@ -2751,10 +2850,15 @@ export default function App() {
     try { localStorage.setItem('dc_dark', darkMode ? '1' : '0'); } catch { /* noop */ }
   }, [darkMode]);
 
-  const handleNew = async () => {
+  const handleNew = () => {
     editMode.current = false;
+    setScreen('pin');
+  };
+
+  const handlePinConfirm = async (agentData: Agent) => {
     const roNumber = await nextRONumber();
-    setCurrentRO(createNewRO(roNumber));
+    const ro = createNewRO(roNumber);
+    setCurrentRO({ ...ro, agent: agentData.name, re: agentData.re, role: agentData.role, agentLocked: true });
     setScreen('wizard');
   };
 
@@ -2835,6 +2939,9 @@ export default function App() {
       ⚠️ Sem conexão — dados salvos localmente
     </div>
   );
+
+  if (screen === 'pin')
+    return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} />;
 
   if (screen === 'wizard' && currentRO)
     return <>{offlineBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
