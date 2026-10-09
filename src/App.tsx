@@ -3,9 +3,15 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
+  collection, doc, setDoc, deleteDoc, onSnapshot,
+  runTransaction, writeBatch, query, orderBy,
+} from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import {
   Camera, ChevronLeft, ChevronRight, Plus, Check,
   Trash2, X, Search, AlertTriangle, FileText, Clock, Printer, Pencil,
-  Moon, Sun, BarChart2, ChevronDown, History, Share2, Mail, MessageCircle,
+  Moon, Sun, BarChart2, ChevronDown, History, Share2, Mail, MessageCircle, LogOut,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -302,13 +308,16 @@ function genId() {
   return Math.random().toString(36).slice(2, 11);
 }
 
-function nextRONumber() {
-  const yy = new Date().getFullYear().toString().slice(-2);
-  const storedYear = localStorage.getItem('dc_ro_year');
-  const n = storedYear === yy ? parseInt(localStorage.getItem('dc_ro_counter') || '0') + 1 : 1;
-  localStorage.setItem('dc_ro_year', yy);
-  localStorage.setItem('dc_ro_counter', String(n));
-  return `${n}/${yy}`;
+async function nextRONumber(): Promise<string> {
+  const counterRef = doc(db, 'meta', 'counter');
+  return runTransaction(db, async t => {
+    const snap = await t.get(counterRef);
+    const yy = new Date().getFullYear().toString().slice(-2);
+    const storedYear = snap.data()?.year as string | undefined;
+    const n = storedYear === yy ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
+    t.set(counterRef, { year: yy, count: n });
+    return `${n}/${yy}`;
+  });
 }
 
 function todayISO() {
@@ -320,9 +329,9 @@ function nowHHMM() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function createNewRO(): OccurrenceReport {
+function createNewRO(roNumber: string): OccurrenceReport {
   return {
-    id: genId(), roNumber: nextRONumber(), emergency: null,
+    id: genId(), roNumber, emergency: null,
     vehicle: '', date: todayISO(), startTime: nowHHMM(), endTime: '',
     origin: '', originText: '', agent: '', re: '',
     reporterName: '', rgCpf: '', phone: '', reporterEmail: '', address: '', addressNumber: '', neighborhood: '',
@@ -1643,7 +1652,7 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
 // HOME
 // ─────────────────────────────────────────────
 
-function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onToggleDark }: {
+function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onToggleDark, onSignOut }: {
   ros: OccurrenceReport[];
   onNew: () => void;
   onView: (r: OccurrenceReport) => void;
@@ -1651,6 +1660,7 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
   onDeleteAll: () => void;
   darkMode: boolean;
   onToggleDark: () => void;
+  onSignOut: () => void;
 }) {
   const [query, setQuery]           = useState('');
   const [confirmId, setConfirmId]   = useState<string | null>(null);
@@ -1717,6 +1727,12 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Sair */}
+              <button type="button" onClick={onSignOut}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+                title="Sair">
+                <LogOut size={18} className="text-red-300" />
+              </button>
               {/* Toggle dark mode */}
               <button type="button" onClick={onToggleDark}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
@@ -2630,17 +2646,113 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
 }
 
 // ─────────────────────────────────────────────
+// LOGIN SCREEN
+// ─────────────────────────────────────────────
+
+const TEAM_EMAIL = 'defesacivil0199@gmail.com';
+
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) return;
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, TEAM_EMAIL, password);
+      onLogin();
+    } catch {
+      setError('Senha incorreta. Verifique e tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <p className="text-4xl mb-3">🔶</p>
+          <p className="text-white font-black text-xl tracking-wide">DEFESA CIVIL</p>
+          <p className="text-blue-300 text-sm mt-1">Cajamar / SP</p>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-2xl">
+          <p className="font-bold text-gray-800 text-base mb-1">Acesso ao Sistema</p>
+          <p className="text-xs text-gray-500 mb-5">Registro de Ocorrências</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1">Conta da equipe</p>
+              <div className="px-4 py-3 bg-gray-100 rounded-xl text-sm text-gray-600 font-medium">
+                {TEAM_EMAIL}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Senha</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Digite a senha da equipe"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]"
+                autoComplete="current-password"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-red-600 text-xs bg-red-50 px-3 py-2 rounded-xl">
+                <AlertTriangle size={14} />
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading || !password}
+              className="w-full py-4 rounded-2xl bg-[#1B3A6B] text-white font-bold text-sm disabled:opacity-50 active:opacity-80">
+              {loading ? 'Verificando...' : 'Entrar'}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-blue-400 text-[11px] mt-6">
+          Acesso restrito · Defesa Civil Cajamar
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // ROOT APP
 // ─────────────────────────────────────────────
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [ros, setRos] = useState<OccurrenceReport[]>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  });
+  const [ros, setRos] = useState<OccurrenceReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null | 'checking'>('checking');
   const [currentRO, setCurrentRO] = useState<OccurrenceReport | null>(null);
   const editMode = useRef(false);
+
+  // ── Autenticação ──
+  useEffect(() => {
+    return onAuthStateChanged(auth, u => setUser(u));
+  }, []);
+
+  // ── Sincronização em tempo real via Firestore (só se autenticado) ──
+  useEffect(() => {
+    if (!user || user === 'checking') return;
+    const q = query(collection(db, 'ros'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setRos(snap.docs.map(d => d.data() as OccurrenceReport));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [user]);
 
   // ── Offline ──
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
@@ -2661,14 +2773,10 @@ export default function App() {
     try { localStorage.setItem('dc_dark', darkMode ? '1' : '0'); } catch { /* noop */ }
   }, [darkMode]);
 
-  const persist = useCallback((updated: OccurrenceReport[]) => {
-    setRos(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, []);
-
-  const handleNew = () => {
+  const handleNew = async () => {
     editMode.current = false;
-    setCurrentRO(createNewRO());
+    const roNumber = await nextRONumber();
+    setCurrentRO(createNewRO(roNumber));
     setScreen('wizard');
   };
 
@@ -2676,7 +2784,7 @@ export default function App() {
     setCurrentRO(prev => prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null);
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!currentRO) return;
     const now = new Date().toISOString();
     const agentName = currentRO.agent
@@ -2691,36 +2799,58 @@ export default function App() {
       updatedAt: now,
       editHistory: [...(currentRO.editHistory ?? []), historyEntry],
     };
-    const idx = ros.findIndex(r => r.id === saved.id);
-    persist(idx >= 0 ? ros.map((r, i) => i === idx ? saved : r) : [...ros, saved]);
+    await setDoc(doc(db, 'ros', saved.id), saved);
     setCurrentRO(saved);
     setScreen('view');
-  }, [currentRO, ros, persist]);
+  }, [currentRO]);
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = useCallback(async () => {
     if (editMode.current && currentRO) {
       setScreen('view');
       return;
     }
     if (currentRO) {
       const draft = { ...currentRO, status: 'draft' as const };
-      const idx = ros.findIndex(r => r.id === draft.id);
-      persist(idx >= 0 ? ros.map((r, i) => i === idx ? draft : r) : [...ros, draft]);
+      await setDoc(doc(db, 'ros', draft.id), draft);
     }
     setScreen('home');
     setCurrentRO(null);
-  }, [currentRO, ros, persist]);
+  }, [currentRO]);
 
   const handleView = (ro: OccurrenceReport) => { setCurrentRO(ro); setScreen('view'); };
   const handleBack = () => { setScreen('home'); setCurrentRO(null); };
   const handleEdit = () => { editMode.current = true; setScreen('wizard'); };
 
-  const handleDelete = (id: string) => {
-    persist(ros.filter(r => r.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteDoc(doc(db, 'ros', id));
   };
-  const handleDeleteAll = () => {
-    persist([]);
+  const handleDeleteAll = async () => {
+    const batch = writeBatch(db);
+    ros.forEach(r => batch.delete(doc(db, 'ros', r.id)));
+    await batch.commit();
   };
+
+  // Aguardando Firebase verificar sessão salva
+  if (user === 'checking')
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1B3A6B]">
+        <p className="text-blue-300 text-sm">🔶 Verificando acesso...</p>
+      </div>
+    );
+
+  // Não autenticado → tela de login
+  if (!user)
+    return <LoginScreen onLogin={() => {}} />;
+
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1B3A6B]">
+        <div className="text-center text-white">
+          <p className="text-2xl font-black mb-2">🔶 DEFESA CIVIL</p>
+          <p className="text-sm text-blue-300">Carregando ocorrências...</p>
+        </div>
+      </div>
+    );
 
   const offlineBanner = !isOnline && (
     <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-xs font-bold text-center py-1.5 no-print">
@@ -2738,5 +2868,5 @@ export default function App() {
     return <>{offlineBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} /></>;
 
   return <>{offlineBanner}<HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll}
-    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} /></>;
+    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} onSignOut={() => signOut(auth)} /></>;
 }
