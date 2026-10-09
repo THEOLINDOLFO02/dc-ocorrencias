@@ -676,7 +676,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (name: stri
               <button type="button" onClick={() => { setOpen(false); setQuery(''); }} className="p-1 -ml-1">
                 <ChevronLeft size={24} />
               </button>
-              <p className="font-bold text-base">Agente Encarregado</p>
+              <p className="font-bold text-base">Preenchido Por</p>
             </div>
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 pointer-events-none" />
@@ -865,24 +865,26 @@ function StepCabecalho({ ro, onChange }: StepProps) {
       </Card>
 
       <Card>
-        <SecTitle>Equipe</SecTitle>
-        <div className="space-y-3">
-          <Field label="Viatura" required>
-            <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
-              <option value="">Selecione a viatura...</option>
-              <option value="VTR-001">VTR-001</option>
-              <option value="VTR-002">VTR-002</option>
-              <option value="VTR-003">VTR-003</option>
-              <option value="VTR-004">VTR-004</option>
-              <option value="VTR-005">VTR-005</option>
-              <option value="Outros">Outros</option>
-            </select>
-          </Field>
-          <Field label="Agente Encarregado" required>
-            <AgentPicker value={ro.agent} onChange={(name, re, role) => onChange({ agent: name, re, role })} />
-          </Field>
-        </div>
+        <SecTitle>Veículo</SecTitle>
+        <Field label="Viatura" required>
+          <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+            <option value="">Selecione a viatura...</option>
+            <option value="VTR-001">VTR-001</option>
+            <option value="VTR-002">VTR-002</option>
+            <option value="VTR-003">VTR-003</option>
+            <option value="VTR-004">VTR-004</option>
+            <option value="VTR-005">VTR-005</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </Field>
+      </Card>
+
+      <Card>
+        <SecTitle>Preenchido Por</SecTitle>
+        <Field label="Responsável pelo preenchimento" required>
+          <AgentPicker value={ro.agent} onChange={(name, re, role) => onChange({ agent: name, re, role })} />
+        </Field>
       </Card>
 
       <Card>
@@ -1531,7 +1533,7 @@ function SignaturePad({ value, onChange }: { value: string; onChange: (v: string
 interface ValidationError { message: string; step: WizardStep; }
 
 function validateRO(ro: OccurrenceReport): ValidationError | null {
-  if (!ro.agent)             return { message: 'Informe o Agente Encarregado.',     step: 1 };
+  if (!ro.agent)             return { message: 'Informe quem está preenchendo o R.O.', step: 1 };
   if (!ro.address)           return { message: 'Informe o endereço da ocorrência.', step: 2 };
   if (!ro.neighborhood)      return { message: 'Informe o bairro da ocorrência.',   step: 2 };
   if (!ro.occurrenceTypeId)  return { message: 'Selecione o tipo de ocorrência.',   step: 3 };
@@ -2079,7 +2081,7 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
           <Row label="Hora inicial" value={ro.startTime} />
           <Row label="Hora final"   value={ro.endTime} />
           <Row label="Viatura"      value={ro.vehicle} />
-          <Row label="Agente"       value={ro.agent ? `${ro.agent}${ro.re ? ` (RE: ${ro.re})` : ''}` : null} />
+          <Row label="Preenchido Por" value={ro.agent ? `${ro.agent}${ro.re ? ` (RE: ${ro.re})` : ''}` : null} />
           <Row label="Origem"       value={ro.origin} />
         </Sec>
 
@@ -2455,7 +2457,7 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             {/* ─ Agente ─ */}
             <tr>
               <TCell colSpan={2}>
-                <TLabel>Agente Encarregado</TLabel>
+                <TLabel>Preenchido Por</TLabel>
                 <TValue>{ro.agent}</TValue>
                 {ro.role && <TValue className="text-gray-500 text-[9px]">{ro.role}</TValue>}
               </TCell>
@@ -2511,30 +2513,6 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             <tr>
               <TCell colSpan={3}>
                 <div className="min-h-[60px] whitespace-pre-wrap text-[10px]">{ro.observations}</div>
-              </TCell>
-            </tr>
-
-            {/* ─ Assinaturas ─ */}
-            <tr className="border-t-2 border-gray-700 bg-gray-50">
-              <TCell colSpan={3}><span className="font-black text-[10px]">ASSINATURAS</span></TCell>
-            </tr>
-            <tr>
-              <TCell>
-                <TLabel>Declarante</TLabel>
-                <TValue>{ro.declarant1}</TValue>
-                {ro.declarant1Role && <TValue className="text-gray-500 text-[9px]">{ro.declarant1Role}</TValue>}
-                {ro.declarant1Sig
-                  ? <img src={ro.declarant1Sig} alt="assinatura" className="mt-2 h-10 object-contain" />
-                  : <div className="mt-4 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
-              </TCell>
-              <TCell colSpan={2}>
-                <TLabel>Agentes Participantes</TLabel>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] mt-0.5">
-                  {(ro.agentParticipants ?? []).length > 0
-                    ? (ro.agentParticipants ?? []).map(n => <span key={n} className="font-medium">{n}</span>)
-                    : <span className="text-gray-400">—</span>}
-                </div>
-                <div className="mt-3 border-t border-gray-400 text-[9px] text-gray-500">Assinaturas dos agentes</div>
               </TCell>
             </tr>
 
