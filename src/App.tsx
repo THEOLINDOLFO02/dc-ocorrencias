@@ -2487,9 +2487,9 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
             {/* ─ Seção dinâmica ─ */}
             {renderDynamic()}
 
-            {/* ─ 2A Apoio ─ */}
+            {/* ─ Apoio ─ */}
             <tr className="border-t-2 border-gray-700 bg-gray-50">
-              <TCell colSpan={3}><span className="font-black text-[10px]">2.A — APOIO E/OU ACIONAMENTO NA OCORRÊNCIA</span></TCell>
+              <TCell colSpan={3}><span className="font-black text-[10px]">APOIO E/OU ACIONAMENTO NA OCORRÊNCIA</span></TCell>
             </tr>
             <tr>
               <TCell colSpan={3}>
@@ -2505,9 +2505,9 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
               </TCell>
             </tr>
 
-            {/* ─ 2B Perdas e Danos ─ */}
+            {/* ─ Perdas e Danos ─ */}
             <tr className="border-t-2 border-gray-700 bg-gray-50">
-              <TCell colSpan={3}><span className="font-black text-[10px]">2.B — PERDAS E DANOS — MATERIAIS</span></TCell>
+              <TCell colSpan={3}><span className="font-black text-[10px]">PERDAS E DANOS — MATERIAIS</span></TCell>
             </tr>
             <tr>
               <TCell colSpan={3}>
@@ -2553,7 +2553,6 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                     ? (ro.agentParticipants ?? []).map(n => <span key={n} className="font-medium">{n}</span>)
                     : <span className="text-gray-400">—</span>}
                 </div>
-                <div className="mt-3 border-t border-gray-400 text-[9px] text-gray-500">Assinaturas dos agentes</div>
               </TCell>
             </tr>
 
