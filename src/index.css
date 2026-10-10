@@ -8,6 +8,7 @@
   --text-main: #111827;
   --text-muted:#6b7280;
   --border:    #e5e7eb;
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
@@ -17,6 +18,7 @@
   --text-main: #f1f5f9;
   --text-muted:#94a3b8;
   --border:    #334155;
+  color-scheme: dark;
 }
 
 body {
@@ -25,30 +27,41 @@ body {
   transition: background-color 0.2s, color 0.2s;
 }
 
-/* ── Realce de contraste para digitação em formulários ── */
+/* ── Formulários e Inputs Adaptativos ── */
+/* Modo Claro: fundo branco com borda nítida e texto preto puro */
 input, textarea, select {
+  background-color: #ffffff !important;
   color: #000000 !important;
   -webkit-text-fill-color: #000000 !important;
+  border: 2px solid #cbd5e1 !important;
   font-weight: 600;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #6b7280 !important;
-  -webkit-text-fill-color: #6b7280 !important;
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
   font-weight: 400;
 }
 
+/* Modo Escuro: fundo escuro com borda nítida e texto branco puro */
 [data-theme="dark"] input,
 [data-theme="dark"] textarea,
 [data-theme="dark"] select {
+  background-color: #0f172a !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
+  border: 2px solid #475569 !important;
 }
 
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder {
   color: #94a3b8 !important;
   -webkit-text-fill-color: #94a3b8 !important;
+}
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
 /* ── Print ── */

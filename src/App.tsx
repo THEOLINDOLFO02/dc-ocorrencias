@@ -388,8 +388,9 @@ function fmtDate(iso: string) {
 function Toggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
+      style={!active ? { backgroundColor: 'var(--border)', color: 'var(--text-main)' } : undefined}
       className={cn('flex-1 py-3 text-sm font-semibold rounded-xl transition-all',
-        active ? 'bg-[#1B3A6B] text-white shadow-sm' : 'bg-gray-100 text-gray-600 active:bg-gray-200')}>
+        active ? 'bg-[#1B3A6B] text-white shadow-sm' : 'active:opacity-80')}>
       {label}
     </button>
   );
@@ -398,7 +399,7 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+      <label style={{ color: 'var(--text-main)' }} className="block text-xs font-bold uppercase tracking-wider opacity-90">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
@@ -411,7 +412,7 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
 }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B]" />
+      className="w-full px-4 py-3 rounded-xl text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
   );
 }
 
@@ -420,7 +421,7 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: {
 }) {
   return (
     <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-      className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B] resize-none" />
+      className="w-full px-4 py-3 rounded-xl text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] resize-none" />
   );
 }
 
@@ -428,20 +429,32 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
   return (
     <label className="flex items-center gap-3 py-2 cursor-pointer select-none" onClick={() => onChange(!checked)}>
       <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
-        checked ? 'bg-[#1B3A6B] border-[#1B3A6B]' : 'border-gray-400 bg-white')}>
+        checked ? 'bg-[#1B3A6B] border-[#1B3A6B]' : 'border-gray-400')}
+        style={!checked ? { backgroundColor: 'var(--bg-card)' } : undefined}>
         {checked && <Check size={12} className="text-white" strokeWidth={3} />}
       </div>
-      <span className="text-sm font-semibold text-gray-900">{label}</span>
+      <span style={{ color: 'var(--text-main)' }} className="text-sm font-semibold">{label}</span>
     </label>
   );
 }
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('bg-white rounded-2xl p-4 shadow-sm border border-gray-100', className)}>{children}</div>;
+  return (
+    <div
+      style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      className={cn('rounded-2xl p-4 shadow-sm border transition-colors', className)}
+    >
+      {children}
+    </div>
+  );
 }
 
 function SecTitle({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] font-bold text-[#1B3A6B] uppercase tracking-widest mb-3">{children}</p>;
+  return (
+    <p style={{ color: 'var(--text-main)' }} className="text-[11px] font-bold uppercase tracking-widest mb-3 opacity-80">
+      {children}
+    </p>
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -869,7 +882,7 @@ function StepCabecalho({ ro, onChange }: StepProps) {
         <SecTitle>Veículo</SecTitle>
         <Field label="Viatura" required>
           <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
-            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base sm:text-sm font-semibold text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+            className="w-full rounded-xl px-4 py-3 text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
             <option value="">Selecione a viatura...</option>
             <option value="VTR-001">VTR-001</option>
             <option value="VTR-002">VTR-002</option>
@@ -979,16 +992,18 @@ function AddressAutocomplete({ value, onChange, onSelect }: {
       <div className="relative">
         <input value={value} onChange={e => { onChange(e.target.value); fetchSuggestions(e.target.value); }}
           placeholder="Rua, Av., Estrada..."
-          className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B]" />
+          className="w-full px-4 py-3 rounded-xl text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
         {loading && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>
         )}
       </div>
       {suggestions.length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          className="absolute z-30 left-0 right-0 mt-1 border rounded-xl shadow-lg overflow-hidden">
           {suggestions.map((r, i) => (
             <button key={i} type="button" onClick={() => pick(r)}
-              className="w-full px-4 py-3 text-left text-xs text-gray-700 border-b border-gray-100 last:border-0 active:bg-gray-50 leading-tight">
+              style={{ color: 'var(--text-main)', borderColor: 'var(--border)' }}
+              className="w-full px-4 py-3 text-left text-xs border-b last:border-0 active:opacity-70 leading-tight">
               {r.display_name}
             </button>
           ))}
@@ -1064,7 +1079,7 @@ function CobradeSelector({ cobrade, onChange }: {
   const items     = selSub   ? COBRADE_LIST.filter(c => c.subgroup === selSub) : [];
 
   const sel = (cls: string) =>
-    `w-full border-2 border-gray-300 rounded-xl px-3 py-2.5 text-base sm:text-sm font-semibold text-black bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${cls}`;
+    `w-full rounded-xl px-3 py-2.5 text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 ${cls}`;
 
   return (
     <div className="mt-3 space-y-3">
@@ -1264,16 +1279,16 @@ function StepApoio({ ro, onChange }: StepProps) {
                   ag.selected ? 'bg-[#1B3A6B] border-[#1B3A6B]' : 'border-gray-300 bg-white')}>
                   {ag.selected && <Check size={12} className="text-white" strokeWidth={3} />}
                 </div>
-                <span className="text-sm text-gray-800">{ag.label}</span>
+                <span style={{ color: 'var(--text-main)' }} className="text-sm font-medium">{ag.label}</span>
               </label>
               {ag.selected && (
                 <div className="ml-8 grid grid-cols-2 gap-2 mb-2">
                   <input value={ag.vehicles} onChange={e => updateAgency(ag.id, { vehicles: e.target.value })}
                     placeholder="Viaturas"
-                    className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                    className="px-3 py-2 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
                   <input value={ag.responsible} onChange={e => updateAgency(ag.id, { responsible: e.target.value })}
                     placeholder="Encarregado"
-                    className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                    className="px-3 py-2 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
                 </div>
               )}
             </div>
@@ -1376,7 +1391,7 @@ function StepFotos({ ro, onChange }: StepProps) {
               <input value={photo.caption}
                 onChange={e => onChange({ photos: ro.photos.map(p => p.id === photo.id ? { ...p, caption: e.target.value } : p) })}
                 placeholder={`Foto ${idx + 1} – Legenda...`}
-                className="mt-2 w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                className="mt-2 w-full px-3 py-2 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
               {photo.lat != null && (
                 <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1">
                   📍 {photo.lat.toFixed(6)}, {photo.lng!.toFixed(6)}
@@ -1580,7 +1595,7 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-main)' }} className="min-h-screen flex flex-col transition-colors">
       {/* Header */}
       <div className="bg-[#1B3A6B] text-white sticky top-0 z-10 shadow-md">
         <div className="flex items-center gap-3 px-4 py-3">
@@ -2769,15 +2784,15 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
 
   return (
     <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-5">
+      <div style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} className="w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 border border-white/10">
         <div className="text-center">
           <div className="text-3xl mb-1">🔶</div>
-          <h2 className="text-lg font-black text-[#1B3A6B]">Identificação</h2>
-          <p className="text-sm text-gray-500 mt-1">Digite seu número de RE para preencher o R.O.</p>
+          <h2 className="text-lg font-black text-[#1B3A6B] dark:text-blue-400">Identificação</h2>
+          <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">Digite seu número de RE para preencher o R.O.</p>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Número de RE</label>
+          <label style={{ color: 'var(--text-main)' }} className="block text-xs font-bold uppercase tracking-wide opacity-80">Número de RE</label>
           <input
             type="number"
             inputMode="numeric"
@@ -2786,7 +2801,7 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
             onKeyDown={e => e.key === 'Enter' && handleConfirm()}
             placeholder="Ex.: 20236"
             autoFocus
-            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-lg text-center font-mono font-bold text-black tracking-widest focus:outline-none focus:border-[#1B3A6B]"
+            className="w-full rounded-xl px-4 py-3 text-lg text-center font-mono font-bold tracking-widest focus:outline-none focus:border-[#1B3A6B]"
           />
           {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
         </div>
