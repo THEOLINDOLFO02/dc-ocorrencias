@@ -398,7 +398,7 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
@@ -411,7 +411,7 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
 }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-transparent" />
+      className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B]" />
   );
 }
 
@@ -420,7 +420,7 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: {
 }) {
   return (
     <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] resize-none" />
+      className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B] resize-none" />
   );
 }
 
@@ -428,10 +428,10 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
   return (
     <label className="flex items-center gap-3 py-2 cursor-pointer select-none" onClick={() => onChange(!checked)}>
       <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
-        checked ? 'bg-[#1B3A6B] border-[#1B3A6B]' : 'border-gray-300 bg-white')}>
+        checked ? 'bg-[#1B3A6B] border-[#1B3A6B]' : 'border-gray-400 bg-white')}>
         {checked && <Check size={12} className="text-white" strokeWidth={3} />}
       </div>
-      <span className="text-sm text-gray-700">{label}</span>
+      <span className="text-sm font-semibold text-gray-900">{label}</span>
     </label>
   );
 }
@@ -869,7 +869,7 @@ function StepCabecalho({ ro, onChange }: StepProps) {
         <SecTitle>Veículo</SecTitle>
         <Field label="Viatura" required>
           <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
+            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base sm:text-sm font-semibold text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
             <option value="">Selecione a viatura...</option>
             <option value="VTR-001">VTR-001</option>
             <option value="VTR-002">VTR-002</option>
@@ -979,7 +979,7 @@ function AddressAutocomplete({ value, onChange, onSelect }: {
       <div className="relative">
         <input value={value} onChange={e => { onChange(e.target.value); fetchSuggestions(e.target.value); }}
           placeholder="Rua, Av., Estrada..."
-          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+          className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-base sm:text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B]" />
         {loading && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>
         )}
@@ -1064,7 +1064,7 @@ function CobradeSelector({ cobrade, onChange }: {
   const items     = selSub   ? COBRADE_LIST.filter(c => c.subgroup === selSub) : [];
 
   const sel = (cls: string) =>
-    `w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${cls}`;
+    `w-full border-2 border-gray-300 rounded-xl px-3 py-2.5 text-base sm:text-sm font-semibold text-black bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${cls}`;
 
   return (
     <div className="mt-3 space-y-3">
@@ -1270,10 +1270,10 @@ function StepApoio({ ro, onChange }: StepProps) {
                 <div className="ml-8 grid grid-cols-2 gap-2 mb-2">
                   <input value={ag.vehicles} onChange={e => updateAgency(ag.id, { vehicles: e.target.value })}
                     placeholder="Viaturas"
-                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                    className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
                   <input value={ag.responsible} onChange={e => updateAgency(ag.id, { responsible: e.target.value })}
                     placeholder="Encarregado"
-                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                    className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
                 </div>
               )}
             </div>
@@ -1376,7 +1376,7 @@ function StepFotos({ ro, onChange }: StepProps) {
               <input value={photo.caption}
                 onChange={e => onChange({ photos: ro.photos.map(p => p.id === photo.id ? { ...p, caption: e.target.value } : p) })}
                 placeholder={`Foto ${idx + 1} – Legenda...`}
-                className="mt-2 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
+                className="mt-2 w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
               {photo.lat != null && (
                 <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1">
                   📍 {photo.lat.toFixed(6)}, {photo.lng!.toFixed(6)}
@@ -2609,7 +2609,11 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 </td>
                 <td className="border border-gray-500 px-2 py-1 text-[10px]">
                   <strong>Viatura:</strong> {ro.vehicle} &nbsp;|&nbsp;
-                  <strong>Equipe:</strong> {ro.agent}{ro.re ? ` (RE: ${ro.re})` : ''}
+                  <strong>Equipe:</strong> {(() => {
+                    const encarregado = ro.agent ? `${ro.agent}${ro.re ? ` (RE: ${ro.re})` : ''}` : '';
+                    const participantes = (ro.agentParticipants ?? []).filter(p => p && p !== ro.agent);
+                    return [encarregado, ...participantes].filter(Boolean).join(', ') || '—';
+                  })()}
                 </td>
               </tr>
               <tr>
@@ -2782,7 +2786,7 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
             onKeyDown={e => e.key === 'Enter' && handleConfirm()}
             placeholder="Ex.: 20236"
             autoFocus
-            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-lg text-center font-mono tracking-widest focus:outline-none focus:border-[#1B3A6B]"
+            className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-lg text-center font-mono font-bold text-black tracking-widest focus:outline-none focus:border-[#1B3A6B]"
           />
           {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
         </div>
