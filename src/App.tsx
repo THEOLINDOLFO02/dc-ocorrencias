@@ -90,6 +90,33 @@ interface OccurrenceReport {
   role: string;
   relatedDocs: string;
   cobrade: { active: boolean; code: string; label: string };
+  interdicao: {
+    active: boolean;
+    numero: string;
+    fichaAvaliacao: string;
+    causas: string[];
+    causaOutros: string;
+    danos: string[];
+    danosOutros: string;
+    bensAfetados: string[];
+    valorParticular: string;
+    valorMunicipal: string;
+    valorEstadual: string;
+    tipo: 'parcial' | 'total' | '';
+    evacuarImovel: '' | 'sim' | 'nao';
+    prazoAbandono: string;
+    destinoMorador: string;
+    destinoOutros: string;
+    destinoContato: string;
+    destinoTelefone: string;
+    destinoEndereco: string;
+    observacoes: string;
+    responsavelTipo: 'proprietario' | 'morador' | 'locatario' | 'testemunha' | '';
+    responsavelNome: string;
+    responsavelRG: string;
+    responsavelTelefone: string;
+    responsavelAssinatura: string;
+  };
   conclusion: string;
   conclusionStatus: 'encaminhar' | 'arquivar' | 'monitoramento' | '';
   encaminharDest: string[];
@@ -343,7 +370,17 @@ function createNewRO(roNumber: string): OccurrenceReport {
     photoScenario: '', photos: [], photoConclusion: '',
     observations: '', declarant1: '', declarant1Role: '', declarant1Sig: '',
     agentParticipants: [], agentLocked: false, filledBy: '', role: '', relatedDocs: '',
-    cobrade: { active: false, code: '', label: '' }, conclusion: '',
+    cobrade: { active: false, code: '', label: '' },
+    interdicao: {
+      active: false, numero: '', fichaAvaliacao: '',
+      causas: [], causaOutros: '', danos: [], danosOutros: '',
+      bensAfetados: [], valorParticular: '', valorMunicipal: '', valorEstadual: '',
+      tipo: '', evacuarImovel: '', prazoAbandono: '',
+      destinoMorador: '', destinoOutros: '', destinoContato: '', destinoTelefone: '', destinoEndereco: '',
+      observacoes: '', responsavelTipo: '', responsavelNome: '', responsavelRG: '',
+      responsavelTelefone: '', responsavelAssinatura: '',
+    },
+    conclusion: '',
     conclusionStatus: '' as const, encaminharDest: [],
     status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     editHistory: [{ at: new Date().toISOString(), by: 'Sistema', action: 'Criado' }],
@@ -1496,6 +1533,218 @@ function StepConcluir({ ro, onChange }: StepProps) {
         <Textarea value={ro.conclusion} onChange={v => onChange({ conclusion: v })}
           placeholder="Conclusão e providências finais..." rows={3} />
       </Card>
+
+      {/* ── Auto de Interdição ── */}
+      <Card>
+        <SecTitle>Auto de Interdição</SecTitle>
+        <Field label="Emitir Auto de Interdição?">
+          <div className="flex gap-3 mt-1">
+            {['Sim', 'Não'].map(opt => {
+              const active = opt === 'Sim' ? ro.interdicao?.active : ro.interdicao?.active === false && ro.interdicao?.active !== undefined;
+              const isActive = opt === 'Sim' ? !!ro.interdicao?.active : !ro.interdicao?.active;
+              return (
+                <button key={opt} type="button"
+                  onClick={() => onChange({ interdicao: { ...ro.interdicao, active: opt === 'Sim' } })}
+                  className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                    isActive ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+      </Card>
+
+      {ro.interdicao?.active && (
+        <div className="space-y-4">
+          <Card>
+            <SecTitle>Identificação do Auto</SecTitle>
+            <div className="space-y-3">
+              <Field label="Nº do Auto de Interdição">
+                <Input value={ro.interdicao.numero} onChange={v => onChange({ interdicao: { ...ro.interdicao, numero: v } })} placeholder="Ex.: 001/2026" />
+              </Field>
+              <Field label="Ficha de Avaliação">
+                <Input value={ro.interdicao.fichaAvaliacao} onChange={v => onChange({ interdicao: { ...ro.interdicao, fichaAvaliacao: v } })} placeholder="Nº da ficha" />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <SecTitle>1 — Causa da Interdição</SecTitle>
+            <div className="space-y-2">
+              {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
+                <button key={c} type="button"
+                  onClick={() => {
+                    const curr = ro.interdicao.causas;
+                    onChange({ interdicao: { ...ro.interdicao, causas: curr.includes(c) ? curr.filter(x => x !== c) : [...curr, c] } });
+                  }}
+                  className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                    ro.interdicao.causas.includes(c) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                  <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                    ro.interdicao.causas.includes(c) ? 'bg-white border-white' : 'border-gray-400')}>
+                    {ro.interdicao.causas.includes(c) && <Check size={12} className="text-[#1B3A6B]" />}
+                  </div>
+                  {c}
+                </button>
+              ))}
+              <Field label="Outros">
+                <Input value={ro.interdicao.causaOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, causaOutros: v } })} placeholder="Descreva..." />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <SecTitle>2 — Danos Aparentes</SecTitle>
+            <div className="space-y-2">
+              {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
+                <button key={d} type="button"
+                  onClick={() => {
+                    const curr = ro.interdicao.danos;
+                    onChange({ interdicao: { ...ro.interdicao, danos: curr.includes(d) ? curr.filter(x => x !== d) : [...curr, d] } });
+                  }}
+                  className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                    ro.interdicao.danos.includes(d) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                  <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                    ro.interdicao.danos.includes(d) ? 'bg-white border-white' : 'border-gray-400')}>
+                    {ro.interdicao.danos.includes(d) && <Check size={12} className="text-[#1B3A6B]" />}
+                  </div>
+                  {d}
+                </button>
+              ))}
+              <Field label="Outros">
+                <Input value={ro.interdicao.danosOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, danosOutros: v } })} placeholder="Descreva..." />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <SecTitle>3 — Bens Afetados</SecTitle>
+            <div className="space-y-3">
+              {[['particular','Particular'],['municipal','Municipal'],['estadual','Estadual']].map(([id, label]) => (
+                <div key={id}>
+                  <button type="button"
+                    onClick={() => {
+                      const curr = ro.interdicao.bensAfetados;
+                      onChange({ interdicao: { ...ro.interdicao, bensAfetados: curr.includes(id) ? curr.filter(x => x !== id) : [...curr, id] } });
+                    }}
+                    className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                      ro.interdicao.bensAfetados.includes(id) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                    <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                      ro.interdicao.bensAfetados.includes(id) ? 'bg-white border-white' : 'border-gray-400')}>
+                      {ro.interdicao.bensAfetados.includes(id) && <Check size={12} className="text-[#1B3A6B]" />}
+                    </div>
+                    {label}
+                  </button>
+                  {ro.interdicao.bensAfetados.includes(id) && (
+                    <div className="mt-2 pl-2">
+                      <Input
+                        value={id === 'particular' ? ro.interdicao.valorParticular : id === 'municipal' ? ro.interdicao.valorMunicipal : ro.interdicao.valorEstadual}
+                        onChange={v => onChange({ interdicao: { ...ro.interdicao, [`valor${label}`]: v } })}
+                        placeholder="Valor estimado R$" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <SecTitle>4 — Tipo de Interdição</SecTitle>
+            <div className="flex gap-3 mb-4">
+              {[['parcial','Parcial'],['total','Total']].map(([id, label]) => (
+                <button key={id} type="button"
+                  onClick={() => onChange({ interdicao: { ...ro.interdicao, tipo: id as 'parcial' | 'total' } })}
+                  className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                    ro.interdicao.tipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Field label="Evacuará o imóvel?">
+              <div className="flex gap-3">
+                {[['sim','Sim'],['nao','Não']].map(([id, label]) => (
+                  <button key={id} type="button"
+                    onClick={() => onChange({ interdicao: { ...ro.interdicao, evacuarImovel: id as 'sim' | 'nao' } })}
+                    className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                      ro.interdicao.evacuarImovel === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            {ro.interdicao.evacuarImovel === 'sim' && (
+              <div className="mt-3">
+                <Field label="Prazo para abandono (deixe vazio para Imediatamente)">
+                  <Input value={ro.interdicao.prazoAbandono} onChange={v => onChange({ interdicao: { ...ro.interdicao, prazoAbandono: v } })} placeholder="Ex.: 24 horas, 3 dias..." />
+                </Field>
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <SecTitle>5 — Destino do Morador</SecTitle>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                {[['parentes','Parentes / Vizinhos'],['outros','Outros']].map(([id, label]) => (
+                  <button key={id} type="button"
+                    onClick={() => onChange({ interdicao: { ...ro.interdicao, destinoMorador: id } })}
+                    className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                      ro.interdicao.destinoMorador === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {ro.interdicao.destinoMorador === 'outros' && (
+                <Input value={ro.interdicao.destinoOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoOutros: v } })} placeholder="Especifique..." />
+              )}
+              <Field label="Contato">
+                <Input value={ro.interdicao.destinoContato} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoContato: v } })} placeholder="Nome para contato" />
+              </Field>
+              <Field label="Telefone">
+                <Input value={ro.interdicao.destinoTelefone} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoTelefone: v } })} placeholder="(11) 00000-0000" />
+              </Field>
+              <Field label="Endereço de destino">
+                <Input value={ro.interdicao.destinoEndereco} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoEndereco: v } })} placeholder="Endereço completo" />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <SecTitle>6 — Observações Importantes</SecTitle>
+            <Textarea value={ro.interdicao.observacoes} onChange={v => onChange({ interdicao: { ...ro.interdicao, observacoes: v } })} rows={4} placeholder="Observações relevantes sobre a interdição..." />
+          </Card>
+
+          <Card>
+            <SecTitle>7 — Responsável pela Moradia / Testemunha</SecTitle>
+            <div className="space-y-3">
+              <Field label="Tipo">
+                <div className="grid grid-cols-2 gap-2">
+                  {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
+                    <button key={id} type="button"
+                      onClick={() => onChange({ interdicao: { ...ro.interdicao, responsavelTipo: id as OccurrenceReport['interdicao']['responsavelTipo'] } })}
+                      className={cn('py-2.5 rounded-xl border-2 font-semibold text-sm transition-colors',
+                        ro.interdicao.responsavelTipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Nome">
+                <Input value={ro.interdicao.responsavelNome} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelNome: v } })} placeholder="Nome completo" />
+              </Field>
+              <Field label="RG">
+                <Input value={ro.interdicao.responsavelRG} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelRG: v } })} placeholder="Número do RG" />
+              </Field>
+              <Field label="Telefone">
+                <Input value={ro.interdicao.responsavelTelefone} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelTelefone: v } })} placeholder="(11) 00000-0000" />
+              </Field>
+              <Field label="Assinatura do responsável (escreva com o dedo)">
+                <SignaturePad value={ro.interdicao.responsavelAssinatura} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelAssinatura: v } })} />
+              </Field>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -2672,6 +2921,227 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 </tr>
               ))}
 
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── DOCUMENTO 3: AUTO DE INTERDIÇÃO ── */}
+      {ro.interdicao?.active && (
+        <div className="bg-white mx-auto my-4 shadow-md print:shadow-none print:my-0 print-page-break
+                        max-w-[210mm] print:max-w-none text-[11px] font-sans leading-tight">
+          <table className="w-full border-collapse border-2 border-gray-700 text-[10px]">
+            <tbody>
+              {/* Cabeçalho institucional igual ao R.O. */}
+              <tr>
+                <TCell colSpan={4} className="text-center py-3">
+                  <div className="font-black text-base text-gray-800">PREFEITURA MUNICIPAL DE CAJAMAR</div>
+                  <div className="font-black text-[13px] text-[#1B3A6B]">🔶 DEFESA CIVIL — AUTO DE INTERDIÇÃO</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Coordenadoria Municipal de Proteção e Defesa Civil — Cajamar/SP</div>
+                </TCell>
+              </tr>
+
+              {/* Identificação */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">IDENTIFICAÇÃO</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <TLabel>Nº do Auto de Interdição</TLabel>
+                  <TValue>{ro.interdicao.numero || '___________'}</TValue>
+                </TCell>
+                <TCell>
+                  <TLabel>Ficha de Avaliação</TLabel>
+                  <TValue>{ro.interdicao.fichaAvaliacao || '___________'}</TValue>
+                </TCell>
+                <TCell>
+                  <TLabel>Nº R.O. Vinculado</TLabel>
+                  <TValue>{ro.roNumber}</TValue>
+                </TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <TLabel>Endereço da Interdição</TLabel>
+                  <TValue>{[ro.address, ro.addressNumber, ro.neighborhood].filter(Boolean).join(', ')}</TValue>
+                </TCell>
+                <TCell colSpan={2}>
+                  <TLabel>Data</TLabel>
+                  <TValue>{ro.date}</TValue>
+                </TCell>
+              </tr>
+
+              {/* 1 — Causa */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">1 — CAUSA DA INTERDIÇÃO</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={4}>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
+                    {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
+                      <span key={c}><CB v={ro.interdicao.causas.includes(c)} />{c}</span>
+                    ))}
+                    {ro.interdicao.causaOutros && <span><CB v={true} />Outros: {ro.interdicao.causaOutros}</span>}
+                  </div>
+                </TCell>
+              </tr>
+
+              {/* 2 — Danos */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">2 — DANOS APARENTES</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={4}>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
+                    {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
+                      <span key={d}><CB v={ro.interdicao.danos.includes(d)} />{d}</span>
+                    ))}
+                    {ro.interdicao.danosOutros && <span><CB v={true} />Outros: {ro.interdicao.danosOutros}</span>}
+                  </div>
+                </TCell>
+              </tr>
+
+              {/* 3 — Bens */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">3 — BENS AFETADOS</span></TCell>
+              </tr>
+              <tr>
+                <TCell>
+                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('particular')} />Particular</span>
+                  {ro.interdicao.bensAfetados.includes('particular') && ro.interdicao.valorParticular && (
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorParticular}</div>
+                  )}
+                </TCell>
+                <TCell>
+                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('municipal')} />Municipal</span>
+                  {ro.interdicao.bensAfetados.includes('municipal') && ro.interdicao.valorMunicipal && (
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorMunicipal}</div>
+                  )}
+                </TCell>
+                <TCell colSpan={2}>
+                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('estadual')} />Estadual</span>
+                  {ro.interdicao.bensAfetados.includes('estadual') && ro.interdicao.valorEstadual && (
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorEstadual}</div>
+                  )}
+                </TCell>
+              </tr>
+
+              {/* 4 — Tipo */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">4 — TIPO DE INTERDIÇÃO</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <div className="flex gap-4 text-[10px]">
+                    <span><CB v={ro.interdicao.tipo === 'parcial'} />Parcial</span>
+                    <span><CB v={ro.interdicao.tipo === 'total'} />Total</span>
+                  </div>
+                </TCell>
+                <TCell colSpan={2}>
+                  <TLabel>Evacuará o imóvel?</TLabel>
+                  <div className="flex gap-4 text-[10px] mt-0.5">
+                    <span><CB v={ro.interdicao.evacuarImovel === 'sim'} />Sim</span>
+                    <span><CB v={ro.interdicao.evacuarImovel === 'nao'} />Não</span>
+                  </div>
+                  {ro.interdicao.evacuarImovel === 'sim' && (
+                    <div className="text-[9px] mt-1 text-gray-700">
+                      Prazo: <strong>{ro.interdicao.prazoAbandono || 'Imediatamente'}</strong>
+                    </div>
+                  )}
+                </TCell>
+              </tr>
+
+              {/* 5 — Destino */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">5 — DESTINO DO MORADOR</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <div className="flex gap-4 text-[10px]">
+                    <span><CB v={ro.interdicao.destinoMorador === 'parentes'} />Parentes / Vizinhos</span>
+                    <span><CB v={ro.interdicao.destinoMorador === 'outros'} />Outros{ro.interdicao.destinoOutros ? `: ${ro.interdicao.destinoOutros}` : ''}</span>
+                  </div>
+                </TCell>
+                <TCell>
+                  <TLabel>Contato</TLabel>
+                  <TValue>{ro.interdicao.destinoContato}</TValue>
+                </TCell>
+                <TCell>
+                  <TLabel>Telefone</TLabel>
+                  <TValue>{ro.interdicao.destinoTelefone}</TValue>
+                </TCell>
+              </tr>
+              {ro.interdicao.destinoEndereco && (
+                <tr>
+                  <TCell colSpan={4}>
+                    <TLabel>Endereço de destino</TLabel>
+                    <TValue>{ro.interdicao.destinoEndereco}</TValue>
+                  </TCell>
+                </tr>
+              )}
+
+              {/* 6 — Observações */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">6 — OBSERVAÇÕES IMPORTANTES</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={4}>
+                  <div className="min-h-[40px] whitespace-pre-wrap text-[10px]">{ro.interdicao.observacoes}</div>
+                </TCell>
+              </tr>
+
+              {/* 7 — Assinatura responsável pela moradia */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">7 — ASSINATURA DO RESPONSÁVEL PELA MORADIA / TESTEMUNHA</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <div className="flex gap-4 text-[10px] mb-1">
+                    {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
+                      <span key={id}><CB v={ro.interdicao.responsavelTipo === id} />{label}</span>
+                    ))}
+                  </div>
+                  <TLabel>Nome</TLabel><TValue>{ro.interdicao.responsavelNome}</TValue>
+                  <TLabel className="mt-1">RG</TLabel><TValue>{ro.interdicao.responsavelRG}</TValue>
+                  <TLabel className="mt-1">Telefone</TLabel><TValue>{ro.interdicao.responsavelTelefone}</TValue>
+                </TCell>
+                <TCell colSpan={2}>
+                  <TLabel>Assinatura — ciente dos termos do presente Auto</TLabel>
+                  {ro.interdicao.responsavelAssinatura
+                    ? <img src={ro.interdicao.responsavelAssinatura} alt="assinatura" className="mt-2 h-12 object-contain" />
+                    : <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
+                  <div className="mt-1 text-[9px] text-gray-500">
+                    Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
+                  </div>
+                </TCell>
+              </tr>
+
+              {/* 8 — Assinatura do agente */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">8 — ASSINATURA DO RESPONSÁVEL PELA INTERDIÇÃO</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={2}>
+                  <TLabel>Nome</TLabel><TValue>{ro.agent}</TValue>
+                  <TLabel className="mt-1">Matrícula (RE)</TLabel><TValue>{ro.re}</TValue>
+                  <TLabel className="mt-1">Cargo</TLabel><TValue>{ro.role}</TValue>
+                </TCell>
+                <TCell colSpan={2}>
+                  <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura do Responsável da Defesa Civil</div>
+                  <div className="mt-1 text-[9px] text-gray-500">
+                    Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
+                  </div>
+                </TCell>
+              </tr>
+
+              {/* Rodapé */}
+              <tr className="border-t-2 border-gray-700">
+                <TCell colSpan={4} className="text-center py-2">
+                  <div className="text-[8px] text-gray-500 leading-relaxed">
+                    Av. Tenente Marques, 3861 – CEP 06579-001 – Portais (Polvilho) – Cajamar/SP – Tel. (11) 4446-0199
+                    &nbsp;|&nbsp; E-mail: defesacivil@cajamar.sp.gov.br
+                  </div>
+                </TCell>
+              </tr>
             </tbody>
           </table>
         </div>
