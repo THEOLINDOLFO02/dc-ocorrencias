@@ -340,12 +340,25 @@ async function nextRONumber(): Promise<string> {
   const counterRef = doc(db, 'meta', 'counter');
   return runTransaction(db, async t => {
     const snap = await t.get(counterRef);
-    const yy = new Date().getFullYear().toString().slice(-2);
+    const fullYear = new Date().getFullYear().toString();
+    const yy = fullYear.slice(-2);
     const storedYear = snap.data()?.year as string | undefined;
-    const n = storedYear === yy ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
-    t.set(counterRef, { year: yy, count: n });
-    return `${n}/${yy}`;
+    const isSameYear = storedYear === fullYear || storedYear === yy;
+    const n = isSameYear ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
+    t.set(counterRef, { year: fullYear, count: n });
+    return `${String(n).padStart(3, '0')}/${fullYear}`;
   });
+}
+
+function formatBRLInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  const num = parseInt(digits, 10);
+  if (!num) return '';
+  const val = (num / 100).toFixed(2);
+  const [intPart, decPart] = val.split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `R$ ${formattedInt},${decPart}`;
 }
 
 function todayISO() {
@@ -372,7 +385,7 @@ function createNewRO(roNumber: string): OccurrenceReport {
     agentParticipants: [], agentLocked: false, filledBy: '', role: '', relatedDocs: '',
     cobrade: { active: false, code: '', label: '' },
     interdicao: {
-      active: false, numero: '', fichaAvaliacao: '',
+      active: false, numero: roNumber, fichaAvaliacao: '',
       causas: [], causaOutros: '', danos: [], danosOutros: '',
       bensAfetados: [], valorParticular: '', valorMunicipal: '', valorEstadual: '',
       tipo: '', evacuarImovel: '', prazoAbandono: '',
@@ -444,11 +457,11 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+function Input({ value, onChange, placeholder, type = 'text', inputMode }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
 }) {
   return (
-    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+    <input type={type} inputMode={inputMode} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
       className="w-full px-4 py-3 rounded-xl text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]" />
   );
 }
@@ -899,7 +912,7 @@ function StepCabecalho({ ro, onChange }: StepProps) {
         <SecTitle>Identificação</SecTitle>
         <div className="space-y-3">
           <Field label="Nº do R.O.">
-            <Input value={ro.roNumber} onChange={v => onChange({ roNumber: v })} placeholder="Ex: 602/26" />
+            <Input value={ro.roNumber} onChange={v => onChange({ roNumber: v })} placeholder="Ex: 001/2026" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Data" required>
@@ -1561,7 +1574,7 @@ function StepConcluir({ ro, onChange }: StepProps) {
             <SecTitle>Identificação do Auto</SecTitle>
             <div className="space-y-3">
               <Field label="Nº do Auto de Interdição">
-                <Input value={ro.interdicao.numero} onChange={v => onChange({ interdicao: { ...ro.interdicao, numero: v } })} placeholder="Ex.: 001/2026" />
+                <Input value={ro.interdicao.numero || ro.roNumber} onChange={v => onChange({ interdicao: { ...ro.interdicao, numero: v } })} placeholder="Ex.: 001/2026" />
               </Field>
               <Field label="Ficha de Avaliação">
                 <Input value={ro.interdicao.fichaAvaliacao} onChange={v => onChange({ interdicao: { ...ro.interdicao, fichaAvaliacao: v } })} placeholder="Nº da ficha" />
@@ -1638,9 +1651,14 @@ function StepConcluir({ ro, onChange }: StepProps) {
                   {ro.interdicao.bensAfetados.includes(id) && (
                     <div className="mt-2 pl-2">
                       <Input
+                        inputMode="numeric"
                         value={id === 'particular' ? ro.interdicao.valorParticular : id === 'municipal' ? ro.interdicao.valorMunicipal : ro.interdicao.valorEstadual}
-                        onChange={v => onChange({ interdicao: { ...ro.interdicao, [`valor${label}`]: v } })}
-                        placeholder="Valor estimado R$" />
+                        onChange={v => {
+                          const formatted = formatBRLInput(v);
+                          const fieldKey = id === 'particular' ? 'valorParticular' : id === 'municipal' ? 'valorMunicipal' : 'valorEstadual';
+                          onChange({ interdicao: { ...ro.interdicao, [fieldKey]: formatted } });
+                        }}
+                        placeholder="R$ 0,00" />
                     </div>
                   )}
                 </div>
@@ -2970,7 +2988,7 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
               <tr>
                 <TCell colSpan={2}>
                   <TLabel>Nº do Auto de Interdição</TLabel>
-                  <TValue>{ro.interdicao.numero || '___________'}</TValue>
+                  <TValue>{ro.interdicao.numero || ro.roNumber || '___________'}</TValue>
                 </TCell>
                 <TCell>
                   <TLabel>Ficha de Avaliação</TLabel>
@@ -3030,19 +3048,19 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 <TCell>
                   <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('particular')} />Particular</span>
                   {ro.interdicao.bensAfetados.includes('particular') && ro.interdicao.valorParticular && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorParticular}</div>
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorParticular.trim().startsWith('R$') ? ro.interdicao.valorParticular : `R$ ${ro.interdicao.valorParticular}`}</div>
                   )}
                 </TCell>
                 <TCell>
                   <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('municipal')} />Municipal</span>
                   {ro.interdicao.bensAfetados.includes('municipal') && ro.interdicao.valorMunicipal && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorMunicipal}</div>
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorMunicipal.trim().startsWith('R$') ? ro.interdicao.valorMunicipal : `R$ ${ro.interdicao.valorMunicipal}`}</div>
                   )}
                 </TCell>
                 <TCell colSpan={2}>
                   <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('estadual')} />Estadual</span>
                   {ro.interdicao.bensAfetados.includes('estadual') && ro.interdicao.valorEstadual && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: R$ {ro.interdicao.valorEstadual}</div>
+                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorEstadual.trim().startsWith('R$') ? ro.interdicao.valorEstadual : `R$ ${ro.interdicao.valorEstadual}`}</div>
                   )}
                 </TCell>
               </tr>
@@ -3397,7 +3415,14 @@ export default function App() {
   };
 
   const handleUpdate = useCallback((updates: Partial<OccurrenceReport>) => {
-    setCurrentRO(prev => prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null);
+    setCurrentRO(prev => {
+      if (!prev) return null;
+      const next = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      if (updates.roNumber && (!prev.interdicao?.numero || prev.interdicao.numero === prev.roNumber)) {
+        next.interdicao = { ...(next.interdicao || prev.interdicao), numero: updates.roNumber };
+      }
+      return next;
+    });
   }, []);
 
   const handleSave = useCallback(async () => {
