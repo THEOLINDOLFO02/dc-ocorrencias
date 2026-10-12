@@ -3146,6 +3146,29 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 </TCell>
               </tr>
 
+              {/* 9 — Notas */}
+              <tr className="border-t-2 border-gray-700 bg-gray-50">
+                <TCell colSpan={4}><span className="font-black text-[10px]">9 — NOTAS</span></TCell>
+              </tr>
+              <tr>
+                <TCell colSpan={4}>
+                  <div className="space-y-1 text-[8px] leading-tight text-gray-700 p-1">
+                    <p>
+                      <strong>1 —</strong> O presente Auto de Interdição é lavrado com base na Lei Federal 12.608/12, Art. 8, Incisos: &ldquo;IV - identificar e mapear, as áreas de risco de desastres; VII - vistoriar edificações e áreas de risco e promover, quando for o caso, a intervenção preventiva e a evacuação da população das áreas de alto risco ou das edificações vulneráveis;&rdquo;.
+                    </p>
+                    <p>
+                      <strong>2 —</strong> O notificado deve evacuar/sair do local/imóvel conforme o Termo de Interdição acima no prazo recomendado.
+                    </p>
+                    <p>
+                      <strong>3 —</strong> Não acatando o presente Auto de Interdição, o morador assume a total responsabilidade por quaisquer eventuais danos materiais ou pessoais, decorrentes de sinistro, que segundo conclusão da Vistoria, pelo local ser considerado de &ldquo;Risco Muito Alto&rdquo;.
+                    </p>
+                    <p>
+                      <strong>4 —</strong> A desinterdição do imóvel poderá ser requerida à Coordenadoria de Proteção e Defesa Civil por meio da apresentação de &ldquo;Laudo Técnico de Segurança e Estabilidade&rdquo;, emitido por profissional habilitado, com sua respectiva ART. As custas deste documento são de responsabilidade do próprio interessado. O modelo deste documento poderá ser obtido na própria Coordenadoria.
+                    </p>
+                  </div>
+                </TCell>
+              </tr>
+
               {/* Rodapé */}
               <tr className="border-t-2 border-gray-700">
                 <TCell colSpan={4} className="text-center py-2">
