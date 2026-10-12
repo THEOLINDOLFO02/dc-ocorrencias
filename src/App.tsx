@@ -2856,12 +2856,18 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                         max-w-[210mm] print:max-w-none text-[11px] font-sans leading-tight">
           <table className="w-full border-collapse border-2 border-gray-700 text-[10px]">
             <tbody>
-              {/* Header */}
+              {/* Header com Brasão e Logo */}
               <tr>
                 <td colSpan={2} className="border border-gray-500 px-3 py-2">
-                  <div className="font-black text-center text-base text-gray-800 mb-1">REGISTRO FOTOGRÁFICO</div>
-                  <div className="font-black text-center text-[11px] text-[#1B3A6B]">
-                    🔶 DEFESA CIVIL — RELATÓRIO DE OCORRÊNCIA
+                  <div className="flex items-center justify-between">
+                    <img src="/brasao-cajamar.gif" alt="Brasão Cajamar" className="w-14 h-14 object-contain" />
+                    <div className="text-center flex-1 mx-2">
+                      <div className="text-[9px] text-gray-600 leading-tight">Prefeitura do Município de Cajamar</div>
+                      <div className="text-[9px] text-gray-600 leading-tight">ESTADO DE SÃO PAULO</div>
+                      <div className="text-[9px] text-gray-600 leading-tight mb-0.5">Coordenadoria de Proteção e Defesa Civil</div>
+                      <div className="font-black text-sm text-gray-800 tracking-wide">REGISTRO FOTOGRÁFICO</div>
+                    </div>
+                    <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-14 h-14 object-contain" />
                   </div>
                 </td>
               </tr>
@@ -2932,12 +2938,19 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                         max-w-[210mm] print:max-w-none text-[11px] font-sans leading-tight">
           <table className="w-full border-collapse border-2 border-gray-700 text-[10px]">
             <tbody>
-              {/* Cabeçalho institucional igual ao R.O. */}
+              {/* Cabeçalho institucional com Brasão e Logo */}
               <tr>
-                <TCell colSpan={4} className="text-center py-3">
-                  <div className="font-black text-base text-gray-800">PREFEITURA MUNICIPAL DE CAJAMAR</div>
-                  <div className="font-black text-[13px] text-[#1B3A6B]">🔶 DEFESA CIVIL — AUTO DE INTERDIÇÃO</div>
-                  <div className="text-[9px] text-gray-500 mt-0.5">Coordenadoria Municipal de Proteção e Defesa Civil — Cajamar/SP</div>
+                <TCell className="w-20 text-center border-r-2 border-gray-700 py-2">
+                  <img src="/brasao-cajamar.gif" alt="Brasão Cajamar" className="w-16 h-16 mx-auto object-contain" />
+                </TCell>
+                <TCell colSpan={2} className="text-center border-r-2 border-gray-700 py-1">
+                  <div className="text-[9px] text-gray-600 leading-tight">Prefeitura do Município de Cajamar</div>
+                  <div className="text-[9px] text-gray-600 leading-tight">ESTADO DE SÃO PAULO</div>
+                  <div className="text-[9px] text-gray-600 leading-tight mb-1">Coordenadoria de Proteção e Defesa Civil</div>
+                  <div className="font-black text-sm text-gray-800 tracking-wide">AUTO DE INTERDIÇÃO</div>
+                </TCell>
+                <TCell className="w-24 text-center py-2">
+                  <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-16 h-16 mx-auto object-contain" />
                 </TCell>
               </tr>
 
