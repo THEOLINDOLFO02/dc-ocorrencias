@@ -2927,6 +2927,15 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
                 </tr>
               ))}
 
+              {/* ─ Rodapé ─ */}
+              <tr className="border-t-2 border-gray-700">
+                <td colSpan={2} className="border border-gray-500 text-center py-2">
+                  <div className="text-[8px] text-gray-500 leading-relaxed">
+                    Av. Tenente Marques, 3861 – CEP 06579-001 – Portais (Polvilho) – Cajamar/SP – Tel. (11) 4446-0199
+                    &nbsp;|&nbsp; E-mail: defesacivil@cajamar.sp.gov.br
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
