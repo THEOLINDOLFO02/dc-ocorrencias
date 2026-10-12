@@ -370,34 +370,121 @@ function nowHHMM() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function createNewRO(roNumber: string): OccurrenceReport {
+function getDefaultInterdicao(roNumber = ''): OccurrenceReport['interdicao'] {
   return {
-    id: genId(), roNumber, emergency: null,
-    vehicle: '', date: todayISO(), startTime: nowHHMM(), endTime: '',
-    origin: '', originText: '', agent: '', re: '',
-    reporterName: '', rgCpf: '', phone: '', reporterEmail: '', address: '', addressNumber: '', neighborhood: '',
-    occurrenceTypeId: '', occurrenceTypeLabel: '', quadrant: '', riskArea: '',
-    dynamicFields: {},
-    agencies: DEFAULT_AGENCIES.map(a => ({ ...a })),
-    losses: { furniture: false, food: false, clothes: false, documents: false, property: false, others: false, othersDesc: '', victims: '', injured: '', deaths: '' },
-    photoScenario: '', photos: [], photoConclusion: '',
-    observations: '', declarant1: '', declarant1Role: '', declarant1Sig: '',
-    agentParticipants: [], agentLocked: false, filledBy: '', role: '', relatedDocs: '',
-    cobrade: { active: false, code: '', label: '' },
-    interdicao: {
-      active: false, numero: roNumber, fichaAvaliacao: '',
-      causas: [], causaOutros: '', danos: [], danosOutros: '',
-      bensAfetados: [], valorParticular: '', valorMunicipal: '', valorEstadual: '',
-      tipo: '', evacuarImovel: '', prazoAbandono: '',
-      destinoMorador: '', destinoOutros: '', destinoContato: '', destinoTelefone: '', destinoEndereco: '',
-      observacoes: '', responsavelTipo: '', responsavelNome: '', responsavelRG: '',
-      responsavelTelefone: '', responsavelAssinatura: '',
-    },
-    conclusion: '',
-    conclusionStatus: '' as const, encaminharDest: [],
-    status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    editHistory: [{ at: new Date().toISOString(), by: 'Sistema', action: 'Criado' }],
+    active: false,
+    numero: roNumber,
+    fichaAvaliacao: '',
+    causas: [],
+    causaOutros: '',
+    danos: [],
+    danosOutros: '',
+    bensAfetados: [],
+    valorParticular: '',
+    valorMunicipal: '',
+    valorEstadual: '',
+    tipo: '',
+    evacuarImovel: '',
+    prazoAbandono: '',
+    destinoMorador: '',
+    destinoOutros: '',
+    destinoContato: '',
+    destinoTelefone: '',
+    destinoEndereco: '',
+    observacoes: '',
+    responsavelTipo: '',
+    responsavelNome: '',
+    responsavelRG: '',
+    responsavelTelefone: '',
+    responsavelAssinatura: '',
   };
+}
+
+function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
+  const roNumber = raw.roNumber || '';
+  const defInterdicao = getDefaultInterdicao(roNumber);
+  const rawInterdicao = raw.interdicao || {};
+
+  return {
+    id: raw.id || genId(),
+    roNumber,
+    emergency: raw.emergency ?? null,
+    vehicle: raw.vehicle || '',
+    date: raw.date || todayISO(),
+    startTime: raw.startTime || nowHHMM(),
+    endTime: raw.endTime || '',
+    origin: raw.origin || '',
+    originText: raw.originText || '',
+    agent: raw.agent || '',
+    re: raw.re || '',
+    reporterName: raw.reporterName || '',
+    rgCpf: raw.rgCpf || '',
+    phone: raw.phone || '',
+    reporterEmail: raw.reporterEmail || '',
+    address: raw.address || '',
+    addressNumber: raw.addressNumber || '',
+    neighborhood: raw.neighborhood || '',
+    occurrenceTypeId: raw.occurrenceTypeId || '',
+    occurrenceTypeLabel: raw.occurrenceTypeLabel || '',
+    quadrant: raw.quadrant || '',
+    riskArea: raw.riskArea || '',
+    dynamicFields: raw.dynamicFields || {},
+    agencies: raw.agencies ?? DEFAULT_AGENCIES.map(a => ({ ...a })),
+    losses: raw.losses ?? { furniture: false, food: false, clothes: false, documents: false, property: false, others: false, othersDesc: '', victims: '', injured: '', deaths: '' },
+    photoScenario: raw.photoScenario || '',
+    photos: raw.photos ?? [],
+    photoConclusion: raw.photoConclusion || '',
+    observations: raw.observations || '',
+    declarant1: raw.declarant1 || '',
+    declarant1Role: raw.declarant1Role || '',
+    declarant1Sig: raw.declarant1Sig || '',
+    agentParticipants: raw.agentParticipants ?? [],
+    agentLocked: !!raw.agentLocked,
+    filledBy: raw.filledBy || '',
+    role: raw.role || '',
+    relatedDocs: raw.relatedDocs || '',
+    cobrade: raw.cobrade ?? { active: false, code: '', label: '' },
+    conclusion: raw.conclusion || '',
+    conclusionStatus: raw.conclusionStatus || ('' as any),
+    encaminharDest: raw.encaminharDest ?? [],
+    status: raw.status || 'draft',
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || new Date().toISOString(),
+    editHistory: raw.editHistory ?? [{ at: new Date().toISOString(), by: 'Sistema', action: 'Criado' }],
+    interdicao: {
+      ...defInterdicao,
+      ...rawInterdicao,
+      active: !!rawInterdicao.active,
+      numero: rawInterdicao.numero || roNumber,
+      causas: Array.isArray(rawInterdicao.causas) ? rawInterdicao.causas : [],
+      danos: Array.isArray(rawInterdicao.danos) ? rawInterdicao.danos : [],
+      bensAfetados: Array.isArray(rawInterdicao.bensAfetados) ? rawInterdicao.bensAfetados : [],
+      valorParticular: rawInterdicao.valorParticular || '',
+      valorMunicipal: rawInterdicao.valorMunicipal || '',
+      valorEstadual: rawInterdicao.valorEstadual || '',
+      fichaAvaliacao: rawInterdicao.fichaAvaliacao || '',
+      causaOutros: rawInterdicao.causaOutros || '',
+      danosOutros: rawInterdicao.danosOutros || '',
+      tipo: rawInterdicao.tipo || '',
+      evacuarImovel: rawInterdicao.evacuarImovel || '',
+      prazoAbandono: rawInterdicao.prazoAbandono || '',
+      destinoMorador: rawInterdicao.destinoMorador || '',
+      destinoOutros: rawInterdicao.destinoOutros || '',
+      destinoContato: rawInterdicao.destinoContato || '',
+      destinoTelefone: rawInterdicao.destinoTelefone || '',
+      destinoEndereco: rawInterdicao.destinoEndereco || '',
+      observacoes: rawInterdicao.observacoes || '',
+      responsavelTipo: rawInterdicao.responsavelTipo || '',
+      responsavelNome: rawInterdicao.responsavelNome || '',
+      responsavelRG: rawInterdicao.responsavelRG || '',
+      responsavelTelefone: rawInterdicao.responsavelTelefone || '',
+      responsavelAssinatura: rawInterdicao.responsavelAssinatura || '',
+    },
+  };
+}
+
+function createNewRO(roNumber: string): OccurrenceReport {
+  return normalizeRO({ roNumber });
 }
 
 async function compressImage(file: File): Promise<string> {
@@ -1548,221 +1635,244 @@ function StepConcluir({ ro, onChange }: StepProps) {
       </Card>
 
       {/* ── Auto de Interdição ── */}
-      <Card>
-        <SecTitle>Auto de Interdição</SecTitle>
-        <Field label="Emitir Auto de Interdição?">
-          <div className="flex gap-3 mt-1">
-            {['Sim', 'Não'].map(opt => {
-              const active = opt === 'Sim' ? ro.interdicao?.active : ro.interdicao?.active === false && ro.interdicao?.active !== undefined;
-              const isActive = opt === 'Sim' ? !!ro.interdicao?.active : !ro.interdicao?.active;
-              return (
-                <button key={opt} type="button"
-                  onClick={() => onChange({ interdicao: { ...ro.interdicao, active: opt === 'Sim' } })}
-                  className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
-                    isActive ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-      </Card>
+      {(() => {
+        const interdicao = {
+          ...getDefaultInterdicao(ro.roNumber),
+          ...(ro.interdicao || {}),
+          numero: ro.interdicao?.numero || ro.roNumber || '',
+          causas: Array.isArray(ro.interdicao?.causas) ? ro.interdicao.causas : [],
+          danos: Array.isArray(ro.interdicao?.danos) ? ro.interdicao.danos : [],
+          bensAfetados: Array.isArray(ro.interdicao?.bensAfetados) ? ro.interdicao.bensAfetados : [],
+        };
 
-      {ro.interdicao?.active && (
-        <div className="space-y-4">
-          <Card>
-            <SecTitle>Identificação do Auto</SecTitle>
-            <div className="space-y-3">
-              <Field label="Nº do Auto de Interdição">
-                <Input value={ro.interdicao.numero || ro.roNumber} onChange={v => onChange({ interdicao: { ...ro.interdicao, numero: v } })} placeholder="Ex.: 001/2026" />
-              </Field>
-              <Field label="Ficha de Avaliação">
-                <Input value={ro.interdicao.fichaAvaliacao} onChange={v => onChange({ interdicao: { ...ro.interdicao, fichaAvaliacao: v } })} placeholder="Nº da ficha" />
-              </Field>
-            </div>
-          </Card>
+        const updateInterdicao = (patch: Partial<OccurrenceReport['interdicao']>) => {
+          onChange({
+            interdicao: {
+              ...interdicao,
+              ...patch,
+            },
+          });
+        };
 
-          <Card>
-            <SecTitle>1 — Causa da Interdição</SecTitle>
-            <div className="space-y-2">
-              {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
-                <button key={c} type="button"
-                  onClick={() => {
-                    const curr = ro.interdicao.causas;
-                    onChange({ interdicao: { ...ro.interdicao, causas: curr.includes(c) ? curr.filter(x => x !== c) : [...curr, c] } });
-                  }}
-                  className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
-                    ro.interdicao.causas.includes(c) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
-                  <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
-                    ro.interdicao.causas.includes(c) ? 'bg-white border-white' : 'border-gray-400')}>
-                    {ro.interdicao.causas.includes(c) && <Check size={12} className="text-[#1B3A6B]" />}
+        return (
+          <>
+            <Card>
+              <SecTitle>Auto de Interdição</SecTitle>
+              <Field label="Emitir Auto de Interdição?">
+                <div className="flex gap-3 mt-1">
+                  {['Sim', 'Não'].map(opt => {
+                    const isActive = opt === 'Sim' ? !!interdicao.active : !interdicao.active;
+                    return (
+                      <button key={opt} type="button"
+                        onClick={() => updateInterdicao({ active: opt === 'Sim', numero: interdicao.numero || ro.roNumber })}
+                        className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                          isActive ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            </Card>
+
+            {interdicao.active && (
+              <div className="space-y-4">
+                <Card>
+                  <SecTitle>Identificação do Auto</SecTitle>
+                  <div className="space-y-3">
+                    <Field label="Nº do Auto de Interdição">
+                      <Input value={interdicao.numero || ro.roNumber} onChange={v => updateInterdicao({ numero: v })} placeholder="Ex.: 001/2026" />
+                    </Field>
+                    <Field label="Ficha de Avaliação">
+                      <Input value={interdicao.fichaAvaliacao || ''} onChange={v => updateInterdicao({ fichaAvaliacao: v })} placeholder="Nº da ficha" />
+                    </Field>
                   </div>
-                  {c}
-                </button>
-              ))}
-              <Field label="Outros">
-                <Input value={ro.interdicao.causaOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, causaOutros: v } })} placeholder="Descreva..." />
-              </Field>
-            </div>
-          </Card>
+                </Card>
 
-          <Card>
-            <SecTitle>2 — Danos Aparentes</SecTitle>
-            <div className="space-y-2">
-              {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
-                <button key={d} type="button"
-                  onClick={() => {
-                    const curr = ro.interdicao.danos;
-                    onChange({ interdicao: { ...ro.interdicao, danos: curr.includes(d) ? curr.filter(x => x !== d) : [...curr, d] } });
-                  }}
-                  className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
-                    ro.interdicao.danos.includes(d) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
-                  <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
-                    ro.interdicao.danos.includes(d) ? 'bg-white border-white' : 'border-gray-400')}>
-                    {ro.interdicao.danos.includes(d) && <Check size={12} className="text-[#1B3A6B]" />}
-                  </div>
-                  {d}
-                </button>
-              ))}
-              <Field label="Outros">
-                <Input value={ro.interdicao.danosOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, danosOutros: v } })} placeholder="Descreva..." />
-              </Field>
-            </div>
-          </Card>
-
-          <Card>
-            <SecTitle>3 — Bens Afetados</SecTitle>
-            <div className="space-y-3">
-              {[['particular','Particular'],['municipal','Municipal'],['estadual','Estadual']].map(([id, label]) => (
-                <div key={id}>
-                  <button type="button"
-                    onClick={() => {
-                      const curr = ro.interdicao.bensAfetados;
-                      onChange({ interdicao: { ...ro.interdicao, bensAfetados: curr.includes(id) ? curr.filter(x => x !== id) : [...curr, id] } });
-                    }}
-                    className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
-                      ro.interdicao.bensAfetados.includes(id) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
-                    <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
-                      ro.interdicao.bensAfetados.includes(id) ? 'bg-white border-white' : 'border-gray-400')}>
-                      {ro.interdicao.bensAfetados.includes(id) && <Check size={12} className="text-[#1B3A6B]" />}
-                    </div>
-                    {label}
-                  </button>
-                  {ro.interdicao.bensAfetados.includes(id) && (
-                    <div className="mt-2 pl-2">
-                      <Input
-                        inputMode="numeric"
-                        value={id === 'particular' ? ro.interdicao.valorParticular : id === 'municipal' ? ro.interdicao.valorMunicipal : ro.interdicao.valorEstadual}
-                        onChange={v => {
-                          const formatted = formatBRLInput(v);
-                          const fieldKey = id === 'particular' ? 'valorParticular' : id === 'municipal' ? 'valorMunicipal' : 'valorEstadual';
-                          onChange({ interdicao: { ...ro.interdicao, [fieldKey]: formatted } });
+                <Card>
+                  <SecTitle>1 — Causa da Interdição</SecTitle>
+                  <div className="space-y-2">
+                    {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
+                      <button key={c} type="button"
+                        onClick={() => {
+                          const curr = interdicao.causas;
+                          updateInterdicao({ causas: curr.includes(c) ? curr.filter(x => x !== c) : [...curr, c] });
                         }}
-                        placeholder="R$ 0,00" />
+                        className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                          interdicao.causas.includes(c) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                        <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                          interdicao.causas.includes(c) ? 'bg-white border-white' : 'border-gray-400')}>
+                          {interdicao.causas.includes(c) && <Check size={12} className="text-[#1B3A6B]" />}
+                        </div>
+                        {c}
+                      </button>
+                    ))}
+                    <Field label="Outros">
+                      <Input value={interdicao.causaOutros || ''} onChange={v => updateInterdicao({ causaOutros: v })} placeholder="Descreva..." />
+                    </Field>
+                  </div>
+                </Card>
+
+                <Card>
+                  <SecTitle>2 — Danos Aparentes</SecTitle>
+                  <div className="space-y-2">
+                    {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
+                      <button key={d} type="button"
+                        onClick={() => {
+                          const curr = interdicao.danos;
+                          updateInterdicao({ danos: curr.includes(d) ? curr.filter(x => x !== d) : [...curr, d] });
+                        }}
+                        className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                          interdicao.danos.includes(d) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                        <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                          interdicao.danos.includes(d) ? 'bg-white border-white' : 'border-gray-400')}>
+                          {interdicao.danos.includes(d) && <Check size={12} className="text-[#1B3A6B]" />}
+                        </div>
+                        {d}
+                      </button>
+                    ))}
+                    <Field label="Outros">
+                      <Input value={interdicao.danosOutros || ''} onChange={v => updateInterdicao({ danosOutros: v })} placeholder="Descreva..." />
+                    </Field>
+                  </div>
+                </Card>
+
+                <Card>
+                  <SecTitle>3 — Bens Afetados</SecTitle>
+                  <div className="space-y-3">
+                    {[['particular','Particular'],['municipal','Municipal'],['estadual','Estadual']].map(([id, label]) => (
+                      <div key={id}>
+                        <button type="button"
+                          onClick={() => {
+                            const curr = interdicao.bensAfetados;
+                            updateInterdicao({ bensAfetados: curr.includes(id) ? curr.filter(x => x !== id) : [...curr, id] });
+                          }}
+                          className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-colors',
+                            interdicao.bensAfetados.includes(id) ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-700 border-gray-200')}>
+                          <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                            interdicao.bensAfetados.includes(id) ? 'bg-white border-white' : 'border-gray-400')}>
+                            {interdicao.bensAfetados.includes(id) && <Check size={12} className="text-[#1B3A6B]" />}
+                          </div>
+                          {label}
+                        </button>
+                        {interdicao.bensAfetados.includes(id) && (
+                          <div className="mt-2 pl-2">
+                            <Input
+                              inputMode="numeric"
+                              value={id === 'particular' ? (interdicao.valorParticular || '') : id === 'municipal' ? (interdicao.valorMunicipal || '') : (interdicao.valorEstadual || '')}
+                              onChange={v => {
+                                const formatted = formatBRLInput(v);
+                                const fieldKey = id === 'particular' ? 'valorParticular' : id === 'municipal' ? 'valorMunicipal' : 'valorEstadual';
+                                updateInterdicao({ [fieldKey]: formatted });
+                              }}
+                              placeholder="R$ 0,00" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card>
+                  <SecTitle>4 — Tipo de Interdição</SecTitle>
+                  <div className="flex gap-3 mb-4">
+                    {[['parcial','Parcial'],['total','Total']].map(([id, label]) => (
+                      <button key={id} type="button"
+                        onClick={() => updateInterdicao({ tipo: id as 'parcial' | 'total' })}
+                        className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                          interdicao.tipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <Field label="Evacuará o imóvel?">
+                    <div className="flex gap-3">
+                      {[['sim','Sim'],['nao','Não']].map(([id, label]) => (
+                        <button key={id} type="button"
+                          onClick={() => updateInterdicao({ evacuarImovel: id as 'sim' | 'nao' })}
+                          className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                            interdicao.evacuarImovel === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                  {interdicao.evacuarImovel === 'sim' && (
+                    <div className="mt-3">
+                      <Field label="Prazo para abandono (deixe vazio para Imediatamente)">
+                        <Input value={interdicao.prazoAbandono || ''} onChange={v => updateInterdicao({ prazoAbandono: v })} placeholder="Ex.: 24 horas, 3 dias..." />
+                      </Field>
                     </div>
                   )}
-                </div>
-              ))}
-            </div>
-          </Card>
+                </Card>
 
-          <Card>
-            <SecTitle>4 — Tipo de Interdição</SecTitle>
-            <div className="flex gap-3 mb-4">
-              {[['parcial','Parcial'],['total','Total']].map(([id, label]) => (
-                <button key={id} type="button"
-                  onClick={() => onChange({ interdicao: { ...ro.interdicao, tipo: id as 'parcial' | 'total' } })}
-                  className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
-                    ro.interdicao.tipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <Field label="Evacuará o imóvel?">
-              <div className="flex gap-3">
-                {[['sim','Sim'],['nao','Não']].map(([id, label]) => (
-                  <button key={id} type="button"
-                    onClick={() => onChange({ interdicao: { ...ro.interdicao, evacuarImovel: id as 'sim' | 'nao' } })}
-                    className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
-                      ro.interdicao.evacuarImovel === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            {ro.interdicao.evacuarImovel === 'sim' && (
-              <div className="mt-3">
-                <Field label="Prazo para abandono (deixe vazio para Imediatamente)">
-                  <Input value={ro.interdicao.prazoAbandono} onChange={v => onChange({ interdicao: { ...ro.interdicao, prazoAbandono: v } })} placeholder="Ex.: 24 horas, 3 dias..." />
-                </Field>
+                <Card>
+                  <SecTitle>5 — Destino do Morador</SecTitle>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      {[['parentes','Parentes / Vizinhos'],['outros','Outros']].map(([id, label]) => (
+                        <button key={id} type="button"
+                          onClick={() => updateInterdicao({ destinoMorador: id })}
+                          className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
+                            interdicao.destinoMorador === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {interdicao.destinoMorador === 'outros' && (
+                      <Input value={interdicao.destinoOutros || ''} onChange={v => updateInterdicao({ destinoOutros: v })} placeholder="Especifique..." />
+                    )}
+                    <Field label="Contato">
+                      <Input value={interdicao.destinoContato || ''} onChange={v => updateInterdicao({ destinoContato: v })} placeholder="Nome para contato" />
+                    </Field>
+                    <Field label="Telefone">
+                      <Input value={interdicao.destinoTelefone || ''} onChange={v => updateInterdicao({ destinoTelefone: v })} placeholder="(11) 00000-0000" />
+                    </Field>
+                    <Field label="Endereço de destino">
+                      <Input value={interdicao.destinoEndereco || ''} onChange={v => updateInterdicao({ destinoEndereco: v })} placeholder="Endereço completo" />
+                    </Field>
+                  </div>
+                </Card>
+
+                <Card>
+                  <SecTitle>6 — Observações Importantes</SecTitle>
+                  <Textarea value={interdicao.observacoes || ''} onChange={v => updateInterdicao({ observacoes: v })} rows={4} placeholder="Observações relevantes sobre a interdição..." />
+                </Card>
+
+                <Card>
+                  <SecTitle>7 — Responsável pela Moradia / Testemunha</SecTitle>
+                  <div className="space-y-3">
+                    <Field label="Tipo">
+                      <div className="grid grid-cols-2 gap-2">
+                        {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
+                          <button key={id} type="button"
+                            onClick={() => updateInterdicao({ responsavelTipo: id as OccurrenceReport['interdicao']['responsavelTipo'] })}
+                            className={cn('py-2.5 rounded-xl border-2 font-semibold text-sm transition-colors',
+                              interdicao.responsavelTipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                    <Field label="Nome">
+                      <Input value={interdicao.responsavelNome || ''} onChange={v => updateInterdicao({ responsavelNome: v })} placeholder="Nome completo" />
+                    </Field>
+                    <Field label="RG">
+                      <Input value={interdicao.responsavelRG || ''} onChange={v => updateInterdicao({ responsavelRG: v })} placeholder="Número do RG" />
+                    </Field>
+                    <Field label="Telefone">
+                      <Input value={interdicao.responsavelTelefone || ''} onChange={v => updateInterdicao({ responsavelTelefone: v })} placeholder="(11) 00000-0000" />
+                    </Field>
+                    <Field label="Assinatura do responsável (escreva com o dedo)">
+                      <SignaturePad value={interdicao.responsavelAssinatura || ''} onChange={v => updateInterdicao({ responsavelAssinatura: v })} />
+                    </Field>
+                  </div>
+                </Card>
               </div>
             )}
-          </Card>
-
-          <Card>
-            <SecTitle>5 — Destino do Morador</SecTitle>
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                {[['parentes','Parentes / Vizinhos'],['outros','Outros']].map(([id, label]) => (
-                  <button key={id} type="button"
-                    onClick={() => onChange({ interdicao: { ...ro.interdicao, destinoMorador: id } })}
-                    className={cn('flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-colors',
-                      ro.interdicao.destinoMorador === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {ro.interdicao.destinoMorador === 'outros' && (
-                <Input value={ro.interdicao.destinoOutros} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoOutros: v } })} placeholder="Especifique..." />
-              )}
-              <Field label="Contato">
-                <Input value={ro.interdicao.destinoContato} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoContato: v } })} placeholder="Nome para contato" />
-              </Field>
-              <Field label="Telefone">
-                <Input value={ro.interdicao.destinoTelefone} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoTelefone: v } })} placeholder="(11) 00000-0000" />
-              </Field>
-              <Field label="Endereço de destino">
-                <Input value={ro.interdicao.destinoEndereco} onChange={v => onChange({ interdicao: { ...ro.interdicao, destinoEndereco: v } })} placeholder="Endereço completo" />
-              </Field>
-            </div>
-          </Card>
-
-          <Card>
-            <SecTitle>6 — Observações Importantes</SecTitle>
-            <Textarea value={ro.interdicao.observacoes} onChange={v => onChange({ interdicao: { ...ro.interdicao, observacoes: v } })} rows={4} placeholder="Observações relevantes sobre a interdição..." />
-          </Card>
-
-          <Card>
-            <SecTitle>7 — Responsável pela Moradia / Testemunha</SecTitle>
-            <div className="space-y-3">
-              <Field label="Tipo">
-                <div className="grid grid-cols-2 gap-2">
-                  {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
-                    <button key={id} type="button"
-                      onClick={() => onChange({ interdicao: { ...ro.interdicao, responsavelTipo: id as OccurrenceReport['interdicao']['responsavelTipo'] } })}
-                      className={cn('py-2.5 rounded-xl border-2 font-semibold text-sm transition-colors',
-                        ro.interdicao.responsavelTipo === id ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]' : 'bg-gray-50 text-gray-600 border-gray-200')}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label="Nome">
-                <Input value={ro.interdicao.responsavelNome} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelNome: v } })} placeholder="Nome completo" />
-              </Field>
-              <Field label="RG">
-                <Input value={ro.interdicao.responsavelRG} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelRG: v } })} placeholder="Número do RG" />
-              </Field>
-              <Field label="Telefone">
-                <Input value={ro.interdicao.responsavelTelefone} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelTelefone: v } })} placeholder="(11) 00000-0000" />
-              </Field>
-              <Field label="Assinatura do responsável (escreva com o dedo)">
-                <SignaturePad value={ro.interdicao.responsavelAssinatura} onChange={v => onChange({ interdicao: { ...ro.interdicao, responsavelAssinatura: v } })} />
-              </Field>
-            </div>
-          </Card>
-        </div>
-      )}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -2960,255 +3070,266 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
       )}
 
       {/* ── DOCUMENTO 3: AUTO DE INTERDIÇÃO ── */}
-      {ro.interdicao?.active && (
-        <div className="bg-white mx-auto my-4 shadow-md print:shadow-none print:my-0 print-page-break
-                        max-w-[210mm] print:max-w-none text-[11px] font-sans leading-tight">
-          <table className="w-full border-collapse border-2 border-gray-700 text-[10px]">
-            <tbody>
-              {/* Cabeçalho institucional com Brasão e Logo */}
-              <tr>
-                <TCell className="w-20 text-center border-r-2 border-gray-700 py-2">
-                  <img src="/brasao-cajamar.gif" alt="Brasão Cajamar" className="w-16 h-16 mx-auto object-contain" />
-                </TCell>
-                <TCell colSpan={2} className="text-center border-r-2 border-gray-700 py-1">
-                  <div className="text-[9px] text-gray-600 leading-tight">Prefeitura do Município de Cajamar</div>
-                  <div className="text-[9px] text-gray-600 leading-tight">ESTADO DE SÃO PAULO</div>
-                  <div className="text-[9px] text-gray-600 leading-tight mb-1">Coordenadoria de Proteção e Defesa Civil</div>
-                  <div className="font-black text-sm text-gray-800 tracking-wide">AUTO DE INTERDIÇÃO</div>
-                </TCell>
-                <TCell className="w-24 text-center py-2">
-                  <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-16 h-16 mx-auto object-contain" />
-                </TCell>
-              </tr>
+      {ro.interdicao?.active && (() => {
+        const interdicao = {
+          ...getDefaultInterdicao(ro.roNumber),
+          ...(ro.interdicao || {}),
+          numero: ro.interdicao?.numero || ro.roNumber || '',
+          causas: Array.isArray(ro.interdicao?.causas) ? ro.interdicao.causas : [],
+          danos: Array.isArray(ro.interdicao?.danos) ? ro.interdicao.danos : [],
+          bensAfetados: Array.isArray(ro.interdicao?.bensAfetados) ? ro.interdicao.bensAfetados : [],
+        };
 
-              {/* Identificação */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">IDENTIFICAÇÃO</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <TLabel>Nº do Auto de Interdição</TLabel>
-                  <TValue>{ro.interdicao.numero || ro.roNumber || '___________'}</TValue>
-                </TCell>
-                <TCell>
-                  <TLabel>Ficha de Avaliação</TLabel>
-                  <TValue>{ro.interdicao.fichaAvaliacao || '___________'}</TValue>
-                </TCell>
-                <TCell>
-                  <TLabel>Nº R.O. Vinculado</TLabel>
-                  <TValue>{ro.roNumber}</TValue>
-                </TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <TLabel>Endereço da Interdição</TLabel>
-                  <TValue>{[ro.address, ro.addressNumber, ro.neighborhood].filter(Boolean).join(', ')}</TValue>
-                </TCell>
-                <TCell colSpan={2}>
-                  <TLabel>Data</TLabel>
-                  <TValue>{ro.date}</TValue>
-                </TCell>
-              </tr>
-
-              {/* 1 — Causa */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">1 — CAUSA DA INTERDIÇÃO</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={4}>
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
-                    {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
-                      <span key={c}><CB v={ro.interdicao.causas.includes(c)} />{c}</span>
-                    ))}
-                    {ro.interdicao.causaOutros && <span><CB v={true} />Outros: {ro.interdicao.causaOutros}</span>}
-                  </div>
-                </TCell>
-              </tr>
-
-              {/* 2 — Danos */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">2 — DANOS APARENTES</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={4}>
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
-                    {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
-                      <span key={d}><CB v={ro.interdicao.danos.includes(d)} />{d}</span>
-                    ))}
-                    {ro.interdicao.danosOutros && <span><CB v={true} />Outros: {ro.interdicao.danosOutros}</span>}
-                  </div>
-                </TCell>
-              </tr>
-
-              {/* 3 — Bens */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">3 — BENS AFETADOS</span></TCell>
-              </tr>
-              <tr>
-                <TCell>
-                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('particular')} />Particular</span>
-                  {ro.interdicao.bensAfetados.includes('particular') && ro.interdicao.valorParticular && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorParticular.trim().startsWith('R$') ? ro.interdicao.valorParticular : `R$ ${ro.interdicao.valorParticular}`}</div>
-                  )}
-                </TCell>
-                <TCell>
-                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('municipal')} />Municipal</span>
-                  {ro.interdicao.bensAfetados.includes('municipal') && ro.interdicao.valorMunicipal && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorMunicipal.trim().startsWith('R$') ? ro.interdicao.valorMunicipal : `R$ ${ro.interdicao.valorMunicipal}`}</div>
-                  )}
-                </TCell>
-                <TCell colSpan={2}>
-                  <span className="text-[10px]"><CB v={ro.interdicao.bensAfetados.includes('estadual')} />Estadual</span>
-                  {ro.interdicao.bensAfetados.includes('estadual') && ro.interdicao.valorEstadual && (
-                    <div className="text-[9px] text-gray-600 ml-4">Valor: {ro.interdicao.valorEstadual.trim().startsWith('R$') ? ro.interdicao.valorEstadual : `R$ ${ro.interdicao.valorEstadual}`}</div>
-                  )}
-                </TCell>
-              </tr>
-
-              {/* 4 — Tipo */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">4 — TIPO DE INTERDIÇÃO</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <div className="flex gap-4 text-[10px]">
-                    <span><CB v={ro.interdicao.tipo === 'parcial'} />Parcial</span>
-                    <span><CB v={ro.interdicao.tipo === 'total'} />Total</span>
-                  </div>
-                </TCell>
-                <TCell colSpan={2}>
-                  <TLabel>Evacuará o imóvel?</TLabel>
-                  <div className="flex gap-4 text-[10px] mt-0.5">
-                    <span><CB v={ro.interdicao.evacuarImovel === 'sim'} />Sim</span>
-                    <span><CB v={ro.interdicao.evacuarImovel === 'nao'} />Não</span>
-                  </div>
-                  {ro.interdicao.evacuarImovel === 'sim' && (
-                    <div className="text-[9px] mt-1 text-gray-700">
-                      Prazo: <strong>{ro.interdicao.prazoAbandono || 'Imediatamente'}</strong>
-                    </div>
-                  )}
-                </TCell>
-              </tr>
-
-              {/* 5 — Destino */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">5 — DESTINO DO MORADOR</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <div className="flex gap-4 text-[10px]">
-                    <span><CB v={ro.interdicao.destinoMorador === 'parentes'} />Parentes / Vizinhos</span>
-                    <span><CB v={ro.interdicao.destinoMorador === 'outros'} />Outros{ro.interdicao.destinoOutros ? `: ${ro.interdicao.destinoOutros}` : ''}</span>
-                  </div>
-                </TCell>
-                <TCell>
-                  <TLabel>Contato</TLabel>
-                  <TValue>{ro.interdicao.destinoContato}</TValue>
-                </TCell>
-                <TCell>
-                  <TLabel>Telefone</TLabel>
-                  <TValue>{ro.interdicao.destinoTelefone}</TValue>
-                </TCell>
-              </tr>
-              {ro.interdicao.destinoEndereco && (
+        return (
+          <div className="bg-white mx-auto my-4 shadow-md print:shadow-none print:my-0 print-page-break
+                          max-w-[210mm] print:max-w-none text-[11px] font-sans leading-tight">
+            <table className="w-full border-collapse border-2 border-gray-700 text-[10px]">
+              <tbody>
+                {/* Cabeçalho institucional com Brasão e Logo */}
                 <tr>
-                  <TCell colSpan={4}>
-                    <TLabel>Endereço de destino</TLabel>
-                    <TValue>{ro.interdicao.destinoEndereco}</TValue>
+                  <TCell className="w-20 text-center border-r-2 border-gray-700 py-2">
+                    <img src="/brasao-cajamar.gif" alt="Brasão Cajamar" className="w-16 h-16 mx-auto object-contain" />
+                  </TCell>
+                  <TCell colSpan={2} className="text-center border-r-2 border-gray-700 py-1">
+                    <div className="text-[9px] text-gray-600 leading-tight">Prefeitura do Município de Cajamar</div>
+                    <div className="text-[9px] text-gray-600 leading-tight">ESTADO DE SÃO PAULO</div>
+                    <div className="text-[9px] text-gray-600 leading-tight mb-1">Coordenadoria de Proteção e Defesa Civil</div>
+                    <div className="font-black text-sm text-gray-800 tracking-wide">AUTO DE INTERDIÇÃO</div>
+                  </TCell>
+                  <TCell className="w-24 text-center py-2">
+                    <img src="/logo-dc-cajamar.jpg" alt="Defesa Civil Cajamar" className="w-16 h-16 mx-auto object-contain" />
                   </TCell>
                 </tr>
-              )}
 
-              {/* 6 — Observações */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">6 — OBSERVAÇÕES IMPORTANTES</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={4}>
-                  <div className="min-h-[40px] whitespace-pre-wrap text-[10px]">{ro.interdicao.observacoes}</div>
-                </TCell>
-              </tr>
+                {/* Identificação */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">IDENTIFICAÇÃO</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <TLabel>Nº do Auto de Interdição</TLabel>
+                    <TValue>{interdicao.numero || ro.roNumber || '___________'}</TValue>
+                  </TCell>
+                  <TCell>
+                    <TLabel>Ficha de Avaliação</TLabel>
+                    <TValue>{interdicao.fichaAvaliacao || '___________'}</TValue>
+                  </TCell>
+                  <TCell>
+                    <TLabel>Nº R.O. Vinculado</TLabel>
+                    <TValue>{ro.roNumber}</TValue>
+                  </TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <TLabel>Endereço da Interdição</TLabel>
+                    <TValue>{[ro.address, ro.addressNumber, ro.neighborhood].filter(Boolean).join(', ')}</TValue>
+                  </TCell>
+                  <TCell colSpan={2}>
+                    <TLabel>Data</TLabel>
+                    <TValue>{ro.date}</TValue>
+                  </TCell>
+                </tr>
 
-              {/* 7 — Assinatura responsável pela moradia */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">7 — ASSINATURA DO RESPONSÁVEL PELA MORADIA / TESTEMUNHA</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <div className="flex gap-4 text-[10px] mb-1">
-                    {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
-                      <span key={id}><CB v={ro.interdicao.responsavelTipo === id} />{label}</span>
-                    ))}
-                  </div>
-                  <TLabel>Nome</TLabel><TValue>{ro.interdicao.responsavelNome}</TValue>
-                  <TLabel className="mt-1">RG</TLabel><TValue>{ro.interdicao.responsavelRG}</TValue>
-                  <TLabel className="mt-1">Telefone</TLabel><TValue>{ro.interdicao.responsavelTelefone}</TValue>
-                </TCell>
-                <TCell colSpan={2}>
-                  <TLabel>Assinatura — ciente dos termos do presente Auto</TLabel>
-                  {ro.interdicao.responsavelAssinatura
-                    ? <img src={ro.interdicao.responsavelAssinatura} alt="assinatura" className="mt-2 h-12 object-contain" />
-                    : <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
-                  <div className="mt-1 text-[9px] text-gray-500">
-                    Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
-                  </div>
-                </TCell>
-              </tr>
+                {/* 1 — Causa */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">1 — CAUSA DA INTERDIÇÃO</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={4}>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
+                      {['Inundação','Enchente','Incêndio','Má Construção','Explosão','Desgaste Natural','Deslizamento de Terra','Desbarrancamento','Desabamento','Obras de Terceiros'].map(c => (
+                        <span key={c}><CB v={interdicao.causas.includes(c)} />{c}</span>
+                      ))}
+                      {interdicao.causaOutros && <span><CB v={true} />Outros: {interdicao.causaOutros}</span>}
+                    </div>
+                  </TCell>
+                </tr>
 
-              {/* 8 — Assinatura do agente */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">8 — ASSINATURA DO RESPONSÁVEL PELA INTERDIÇÃO</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={2}>
-                  <TLabel>Nome</TLabel><TValue>{ro.agent}</TValue>
-                  <TLabel className="mt-1">Matrícula (RE)</TLabel><TValue>{ro.re}</TValue>
-                  <TLabel className="mt-1">Cargo</TLabel><TValue>{ro.role}</TValue>
-                </TCell>
-                <TCell colSpan={2}>
-                  <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura do Responsável da Defesa Civil</div>
-                  <div className="mt-1 text-[9px] text-gray-500">
-                    Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
-                  </div>
-                </TCell>
-              </tr>
+                {/* 2 — Danos */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">2 — DANOS APARENTES</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={4}>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
+                      {['Teto','Parede','Pisos','Estrutura','Fundações'].map(d => (
+                        <span key={d}><CB v={interdicao.danos.includes(d)} />{d}</span>
+                      ))}
+                      {interdicao.danosOutros && <span><CB v={true} />Outros: {interdicao.danosOutros}</span>}
+                    </div>
+                  </TCell>
+                </tr>
 
-              {/* 9 — Notas */}
-              <tr className="border-t-2 border-gray-700 bg-gray-50">
-                <TCell colSpan={4}><span className="font-black text-[10px]">9 — NOTAS</span></TCell>
-              </tr>
-              <tr>
-                <TCell colSpan={4}>
-                  <div className="space-y-1 text-[8px] leading-tight text-gray-700 p-1">
-                    <p>
-                      <strong>1 —</strong> O presente Auto de Interdição é lavrado com base na Lei Federal 12.608/12, Art. 8, Incisos: &ldquo;IV - identificar e mapear, as áreas de risco de desastres; VII - vistoriar edificações e áreas de risco e promover, quando for o caso, a intervenção preventiva e a evacuação da população das áreas de alto risco ou das edificações vulneráveis;&rdquo;.
-                    </p>
-                    <p>
-                      <strong>2 —</strong> O notificado deve evacuar/sair do local/imóvel conforme o Termo de Interdição acima no prazo recomendado.
-                    </p>
-                    <p>
-                      <strong>3 —</strong> Não acatando o presente Auto de Interdição, o morador assume a total responsabilidade por quaisquer eventuais danos materiais ou pessoais, decorrentes de sinistro, que segundo conclusão da Vistoria, pelo local ser considerado de &ldquo;Risco Muito Alto&rdquo;.
-                    </p>
-                    <p>
-                      <strong>4 —</strong> A desinterdição do imóvel poderá ser requerida à Coordenadoria de Proteção e Defesa Civil por meio da apresentação de &ldquo;Laudo Técnico de Segurança e Estabilidade&rdquo;, emitido por profissional habilitado, com sua respectiva ART. As custas deste documento são de responsabilidade do próprio interessado. O modelo deste documento poderá ser obtido na própria Coordenadoria.
-                    </p>
-                  </div>
-                </TCell>
-              </tr>
+                {/* 3 — Bens */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">3 — BENS AFETADOS</span></TCell>
+                </tr>
+                <tr>
+                  <TCell>
+                    <span className="text-[10px]"><CB v={interdicao.bensAfetados.includes('particular')} />Particular</span>
+                    {interdicao.bensAfetados.includes('particular') && interdicao.valorParticular && (
+                      <div className="text-[9px] text-gray-600 ml-4">Valor: {interdicao.valorParticular.trim().startsWith('R$') ? interdicao.valorParticular : `R$ ${interdicao.valorParticular}`}</div>
+                    )}
+                  </TCell>
+                  <TCell>
+                    <span className="text-[10px]"><CB v={interdicao.bensAfetados.includes('municipal')} />Municipal</span>
+                    {interdicao.bensAfetados.includes('municipal') && interdicao.valorMunicipal && (
+                      <div className="text-[9px] text-gray-600 ml-4">Valor: {interdicao.valorMunicipal.trim().startsWith('R$') ? interdicao.valorMunicipal : `R$ ${interdicao.valorMunicipal}`}</div>
+                    )}
+                  </TCell>
+                  <TCell colSpan={2}>
+                    <span className="text-[10px]"><CB v={interdicao.bensAfetados.includes('estadual')} />Estadual</span>
+                    {interdicao.bensAfetados.includes('estadual') && interdicao.valorEstadual && (
+                      <div className="text-[9px] text-gray-600 ml-4">Valor: {interdicao.valorEstadual.trim().startsWith('R$') ? interdicao.valorEstadual : `R$ ${interdicao.valorEstadual}`}</div>
+                    )}
+                  </TCell>
+                </tr>
 
-              {/* Rodapé */}
-              <tr className="border-t-2 border-gray-700">
-                <TCell colSpan={4} className="text-center py-2">
-                  <div className="text-[8px] text-gray-500 leading-relaxed">
-                    Av. Tenente Marques, 3861 – CEP 06579-001 – Portais (Polvilho) – Cajamar/SP – Tel. (11) 4446-0199
-                    &nbsp;|&nbsp; E-mail: defesacivil@cajamar.sp.gov.br
-                  </div>
-                </TCell>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+                {/* 4 — Tipo */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">4 — TIPO DE INTERDIÇÃO</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <div className="flex gap-4 text-[10px]">
+                      <span><CB v={interdicao.tipo === 'parcial'} />Parcial</span>
+                      <span><CB v={interdicao.tipo === 'total'} />Total</span>
+                    </div>
+                  </TCell>
+                  <TCell colSpan={2}>
+                    <TLabel>Evacuará o imóvel?</TLabel>
+                    <div className="flex gap-4 text-[10px] mt-0.5">
+                      <span><CB v={interdicao.evacuarImovel === 'sim'} />Sim</span>
+                      <span><CB v={interdicao.evacuarImovel === 'nao'} />Não</span>
+                    </div>
+                    {interdicao.evacuarImovel === 'sim' && (
+                      <div className="text-[9px] mt-1 text-gray-700">
+                        Prazo: <strong>{interdicao.prazoAbandono || 'Imediatamente'}</strong>
+                      </div>
+                    )}
+                  </TCell>
+                </tr>
+
+                {/* 5 — Destino */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">5 — DESTINO DO MORADOR</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <div className="flex gap-4 text-[10px]">
+                      <span><CB v={interdicao.destinoMorador === 'parentes'} />Parentes / Vizinhos</span>
+                      <span><CB v={interdicao.destinoMorador === 'outros'} />Outros{interdicao.destinoOutros ? `: ${interdicao.destinoOutros}` : ''}</span>
+                    </div>
+                  </TCell>
+                  <TCell>
+                    <TLabel>Contato</TLabel>
+                    <TValue>{interdicao.destinoContato}</TValue>
+                  </TCell>
+                  <TCell>
+                    <TLabel>Telefone</TLabel>
+                    <TValue>{interdicao.destinoTelefone}</TValue>
+                  </TCell>
+                </tr>
+                {interdicao.destinoEndereco && (
+                  <tr>
+                    <TCell colSpan={4}>
+                      <TLabel>Endereço de destino</TLabel>
+                      <TValue>{interdicao.destinoEndereco}</TValue>
+                    </TCell>
+                  </tr>
+                )}
+
+                {/* 6 — Observações */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">6 — OBSERVAÇÕES IMPORTANTES</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={4}>
+                    <div className="min-h-[40px] whitespace-pre-wrap text-[10px]">{interdicao.observacoes}</div>
+                  </TCell>
+                </tr>
+
+                {/* 7 — Assinatura responsável pela moradia */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">7 — ASSINATURA DO RESPONSÁVEL PELA MORADIA / TESTEMUNHA</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <div className="flex gap-4 text-[10px] mb-1">
+                      {[['proprietario','Proprietário'],['morador','Morador'],['locatario','Locatário'],['testemunha','Testemunha']].map(([id, label]) => (
+                        <span key={id}><CB v={interdicao.responsavelTipo === id} />{label}</span>
+                      ))}
+                    </div>
+                    <TLabel>Nome</TLabel><TValue>{interdicao.responsavelNome}</TValue>
+                    <TLabel className="mt-1">RG</TLabel><TValue>{interdicao.responsavelRG}</TValue>
+                    <TLabel className="mt-1">Telefone</TLabel><TValue>{interdicao.responsavelTelefone}</TValue>
+                  </TCell>
+                  <TCell colSpan={2}>
+                    <TLabel>Assinatura — ciente dos termos do presente Auto</TLabel>
+                    {interdicao.responsavelAssinatura
+                      ? <img src={interdicao.responsavelAssinatura} alt="assinatura" className="mt-2 h-12 object-contain" />
+                      : <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura</div>}
+                    <div className="mt-1 text-[9px] text-gray-500">
+                      Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
+                    </div>
+                  </TCell>
+                </tr>
+
+                {/* 8 — Assinatura do agente */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">8 — ASSINATURA DO RESPONSÁVEL PELA INTERDIÇÃO</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={2}>
+                    <TLabel>Nome</TLabel><TValue>{ro.agent}</TValue>
+                    <TLabel className="mt-1">Matrícula (RE)</TLabel><TValue>{ro.re}</TValue>
+                    <TLabel className="mt-1">Cargo</TLabel><TValue>{ro.role}</TValue>
+                  </TCell>
+                  <TCell colSpan={2}>
+                    <div className="mt-8 border-t border-gray-400 text-[9px] text-gray-500">Assinatura do Responsável da Defesa Civil</div>
+                    <div className="mt-1 text-[9px] text-gray-500">
+                      Cajamar, {ro.date ? new Date(ro.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '___/___/______'}
+                    </div>
+                  </TCell>
+                </tr>
+
+                {/* 9 — Notas */}
+                <tr className="border-t-2 border-gray-700 bg-gray-50">
+                  <TCell colSpan={4}><span className="font-black text-[10px]">9 — NOTAS</span></TCell>
+                </tr>
+                <tr>
+                  <TCell colSpan={4}>
+                    <div className="space-y-1 text-[8px] leading-tight text-gray-700 p-1">
+                      <p>
+                        <strong>1 —</strong> O presente Auto de Interdição é lavrado com base na Lei Federal 12.608/12, Art. 8, Incisos: &ldquo;IV - identificar e mapear, as áreas de risco de desastres; VII - vistoriar edificações e áreas de risco e promover, quando for o caso, a intervenção preventiva e a evacuação da população das áreas de alto risco ou das edificações vulneráveis;&rdquo;.
+                      </p>
+                      <p>
+                        <strong>2 —</strong> O notificado deve evacuar/sair do local/imóvel conforme o Termo de Interdição acima no prazo recomendado.
+                      </p>
+                      <p>
+                        <strong>3 —</strong> Não acatando o presente Auto de Interdição, o morador assume a total responsabilidade por quaisquer eventuais danos materiais ou pessoais, decorrentes de sinistro, que segundo conclusão da Vistoria, pelo local ser considerado de &ldquo;Risco Muito Alto&rdquo;.
+                      </p>
+                      <p>
+                        <strong>4 —</strong> A desinterdição do imóvel poderá ser requerida à Coordenadoria de Proteção e Defesa Civil por meio da apresentação de &ldquo;Laudo Técnico de Segurança e Estabilidade&rdquo;, emitido por profissional habilitado, com sua respectiva ART. As custas deste documento são de responsabilidade do próprio interessado. O modelo deste documento poderá ser obtido na própria Coordenadoria.
+                      </p>
+                    </div>
+                  </TCell>
+                </tr>
+
+                {/* Rodapé */}
+                <tr className="border-t-2 border-gray-700">
+                  <TCell colSpan={4} className="text-center py-2">
+                    <div className="text-[8px] text-gray-500 leading-relaxed">
+                      Av. Tenente Marques, 3861 – CEP 06579-001 – Portais (Polvilho) – Cajamar/SP – Tel. (11) 4446-0199
+                      &nbsp;|&nbsp; E-mail: defesacivil@cajamar.sp.gov.br
+                    </div>
+                  </TCell>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       <div className="no-print h-8" />
     </div>
@@ -3377,7 +3498,7 @@ export default function App() {
     if (!user || user === 'checking') return;
     const q = query(collection(db, 'ros'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, snap => {
-      setRos(snap.docs.map(d => d.data() as OccurrenceReport));
+      setRos(snap.docs.map(d => normalizeRO(d.data() as Partial<OccurrenceReport>)));
       setLoading(false);
     }, () => setLoading(false));
     return unsub;
@@ -3418,8 +3539,15 @@ export default function App() {
     setCurrentRO(prev => {
       if (!prev) return null;
       const next = { ...prev, ...updates, updatedAt: new Date().toISOString() };
-      if (updates.roNumber && (!prev.interdicao?.numero || prev.interdicao.numero === prev.roNumber)) {
-        next.interdicao = { ...(next.interdicao || prev.interdicao), numero: updates.roNumber };
+      if (updates.roNumber) {
+        const prevNumero = prev.interdicao?.numero;
+        if (!prevNumero || prevNumero === prev.roNumber) {
+          next.interdicao = {
+            ...(prev.interdicao || getDefaultInterdicao(updates.roNumber)),
+            ...(next.interdicao || {}),
+            numero: updates.roNumber,
+          };
+        }
       }
       return next;
     });
@@ -3458,9 +3586,13 @@ export default function App() {
     setCurrentRO(null);
   }, [currentRO]);
 
-  const handleView = (ro: OccurrenceReport) => { setCurrentRO(ro); setScreen('view'); };
+  const handleView = (ro: OccurrenceReport) => { setCurrentRO(normalizeRO(ro)); setScreen('view'); };
   const handleBack = () => { setScreen('home'); setCurrentRO(null); };
-  const handleEdit = () => { editMode.current = true; setScreen('wizard'); };
+  const handleEdit = () => {
+    setCurrentRO(prev => prev ? normalizeRO(prev) : null);
+    editMode.current = true;
+    setScreen('wizard');
+  };
 
   const handleDelete = async (id: string) => {
     await deleteDoc(doc(db, 'ros', id));
