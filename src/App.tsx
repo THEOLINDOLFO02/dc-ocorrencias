@@ -12,6 +12,7 @@ import {
   Camera, ChevronLeft, ChevronRight, Plus, Check,
   Trash2, X, Search, AlertTriangle, FileText, Clock, Printer, Pencil,
   Moon, Sun, BarChart2, ChevronDown, History, Share2, Mail, MessageCircle, LogOut,
+  Filter, Download,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -2077,17 +2078,42 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
   const [confirmId, setConfirmId]   = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [showStats, setShowStats]   = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo, setDateTo]         = useState('');
 
   const q = query.trim().toLowerCase();
-  const filtered = [...ros].reverse().filter(ro =>
-    !q ||
-    ro.roNumber.toLowerCase().includes(q) ||
-    ro.occurrenceTypeLabel.toLowerCase().includes(q) ||
-    ro.neighborhood.toLowerCase().includes(q) ||
-    ro.address.toLowerCase().includes(q) ||
-    ro.rgCpf.toLowerCase().includes(q) ||
-    ro.reporterName.toLowerCase().includes(q)
-  );
+  const filtered = [...ros].reverse().filter(ro => {
+    if (q && !(
+      ro.roNumber.toLowerCase().includes(q) ||
+      ro.occurrenceTypeLabel.toLowerCase().includes(q) ||
+      ro.neighborhood.toLowerCase().includes(q) ||
+      ro.address.toLowerCase().includes(q) ||
+      ro.rgCpf.toLowerCase().includes(q) ||
+      ro.reporterName.toLowerCase().includes(q)
+    )) return false;
+    if (dateFrom && ro.date < dateFrom) return false;
+    if (dateTo   && ro.date > dateTo)   return false;
+    return true;
+  });
+
+  const exportCSV = () => {
+    const header = ['Nº R.O.','Data','Tipo','Endereço','Bairro','Preenchido Por','Status','Desfecho'];
+    const rows = [...ros].reverse().map(r => [
+      r.roNumber, r.date, r.occurrenceTypeLabel,
+      [r.address, r.addressNumber].filter(Boolean).join(', '),
+      r.neighborhood,
+      AGENTS.find(a => a.name === r.agent)?.display ?? r.agent ?? '',
+      r.status === 'completed' ? 'Concluído' : 'Rascunho',
+      ({ encaminhar: 'Encaminhar', arquivar: 'Arquivar', monitoramento: 'Monitoramento', '': '' } as Record<string,string>)[r.conclusionStatus] ?? '',
+    ]);
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `ROs_DefesaCivil_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
 
   // ── Estatísticas ──
   const now = new Date();
@@ -2176,6 +2202,43 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
               placeholder="Buscar por nº, tipo, bairro, rua, CPF/RG..."
               className="w-full bg-white/10 text-white placeholder-blue-300 rounded-xl pl-9 pr-4 py-2.5 text-sm border border-white/20 focus:outline-none focus:bg-white/20" />
           </div>
+
+          {/* Filtros e Exportar */}
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => setShowFilters(f => !f)}
+              className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors',
+                showFilters ? 'bg-orange-400 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20')}>
+              <Filter size={13} /> Filtrar por data
+              {(dateFrom || dateTo) && <span className="w-2 h-2 bg-orange-300 rounded-full" />}
+            </button>
+            {ros.length > 0 && (
+              <button type="button" onClick={exportCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 text-blue-200 hover:bg-white/20 transition-colors">
+                <Download size={13} /> Exportar CSV
+              </button>
+            )}
+          </div>
+
+          {showFilters && (
+            <div className="mt-2 flex gap-2">
+              <div className="flex-1">
+                <label className="block text-[10px] text-blue-300 mb-1">De</label>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  className="w-full bg-white/10 text-white rounded-xl px-3 py-2 text-sm border border-white/20 focus:outline-none" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] text-blue-300 mb-1">Até</label>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  className="w-full bg-white/10 text-white rounded-xl px-3 py-2 text-sm border border-white/20 focus:outline-none" />
+              </div>
+              {(dateFrom || dateTo) && (
+                <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="self-end mb-0.5 px-3 py-2 rounded-xl bg-red-500/30 text-red-200 text-xs font-bold">
+                  Limpar
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -3494,12 +3557,42 @@ export default function App() {
   }, []);
 
   // ── Sincronização em tempo real via Firestore (só se autenticado) ──
+  // Solicita permissão de notificação ao logar
+  useEffect(() => {
+    if (!user || user === 'checking') return;
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [user]);
+
+  const rosIds = useRef<Set<string>>(new Set());
+  const firstLoad = useRef(true);
+
   useEffect(() => {
     if (!user || user === 'checking') return;
     const q = query(collection(db, 'ros'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, snap => {
-      setRos(snap.docs.map(d => normalizeRO(d.data() as Partial<OccurrenceReport>)));
+      const list = snap.docs.map(d => normalizeRO(d.data() as Partial<OccurrenceReport>));
+      setRos(list);
       setLoading(false);
+
+      // Notificação quando outro agente salva um R.O. novo
+      if (!firstLoad.current && Notification.permission === 'granted') {
+        snap.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const ro = normalizeRO(change.doc.data() as Partial<OccurrenceReport>);
+            if (!rosIds.current.has(ro.id) && ro.status === 'completed') {
+              const ag = AGENTS.find(a => a.name === ro.agent);
+              new Notification('🔶 Novo R.O. registrado', {
+                body: `R.O. ${ro.roNumber} — ${ro.occurrenceTypeLabel || 'Ocorrência'}\n${ro.address || ''}\nPor: ${ag?.display ?? ro.agent ?? 'Agente'}`,
+                icon: '/pwa-192x192.png',
+              });
+            }
+          }
+        });
+      }
+      firstLoad.current = false;
+      rosIds.current = new Set(list.map(r => r.id));
     }, () => setLoading(false));
     return unsub;
   }, [user]);
