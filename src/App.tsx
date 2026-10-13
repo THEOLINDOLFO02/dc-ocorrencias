@@ -1950,6 +1950,24 @@ function validateRO(ro: OccurrenceReport): ValidationError | null {
   return null;
 }
 
+function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-gray-50 rounded-2xl p-4">
+      <p className="text-[10px] font-black text-[#1B3A6B] uppercase tracking-wider mb-2">{title}</p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+function ReviewRow({ label, value, highlight }: { label: string; value?: string; highlight?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className="flex gap-2">
+      {label && <span className="text-[11px] text-gray-500 min-w-[90px] flex-shrink-0">{label}</span>}
+      <span className={cn('text-xs font-semibold flex-1', highlight ? 'text-orange-600' : 'text-gray-800')}>{value}</span>
+    </div>
+  );
+}
+
 function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
   ro: OccurrenceReport;
   onUpdate: (u: Partial<OccurrenceReport>) => void;
@@ -1959,13 +1977,14 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
   const [step, setStep] = useState<WizardStep>(1);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [validationError, setValidationError] = useState<ValidationError | null>(null);
+  const [showReview, setShowReview] = useState(false);
   const TOTAL = 7;
 
   const goNext = () => {
     if (step < TOTAL) { setStep((step + 1) as WizardStep); window.scrollTo(0, 0); return; }
     const err = validateRO(ro);
     if (err) { setValidationError(err); return; }
-    onSave();
+    setShowReview(true);
   };
   const goBack = () => {
     if (step > 1) { setStep((step - 1) as WizardStep); window.scrollTo(0, 0); }
@@ -2016,6 +2035,103 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
             : <>Continuar <ChevronRight size={18} /></>}
         </button>
       </div>
+
+      {/* Modal — revisão antes de salvar */}
+      {showReview && (
+        <div className="fixed inset-0 bg-black/70 flex flex-col z-50 overflow-y-auto">
+          <div className="bg-white rounded-t-3xl mt-auto min-h-[85vh] flex flex-col">
+            <div className="sticky top-0 bg-white rounded-t-3xl px-5 pt-5 pb-3 border-b border-gray-100 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-black text-[#1B3A6B] text-base">Revisão do R.O.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Confirme os dados antes de salvar</p>
+                </div>
+                <button type="button" onClick={() => setShowReview(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                  <ChevronLeft size={18} className="text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {/* Identificação */}
+              <ReviewSection title="Identificação">
+                <ReviewRow label="Nº R.O." value={ro.roNumber} />
+                <ReviewRow label="Data" value={ro.date} />
+                <ReviewRow label="Hora inicial" value={ro.startTime} />
+                <ReviewRow label="Viatura" value={ro.vehicle} />
+                <ReviewRow label="Preenchido por" value={AGENTS.find(a => a.name === ro.agent)?.display ?? ro.agent} />
+                {ro.role && <ReviewRow label="Cargo" value={ro.role} />}
+              </ReviewSection>
+
+              {/* Endereço */}
+              <ReviewSection title="Endereço">
+                <ReviewRow label="Logradouro" value={[ro.address, ro.addressNumber].filter(Boolean).join(', ')} />
+                <ReviewRow label="Bairro" value={ro.neighborhood} />
+                {ro.complement && <ReviewRow label="Complemento" value={ro.complement} />}
+              </ReviewSection>
+
+              {/* Ocorrência */}
+              <ReviewSection title="Ocorrência">
+                <ReviewRow label="Tipo" value={ro.occurrenceTypeLabel} />
+                {ro.emergency && <ReviewRow label="Emergência" value="Sim" highlight />}
+              </ReviewSection>
+
+              {/* Solicitante */}
+              {(ro.reporterName || ro.reporterPhone) && (
+                <ReviewSection title="Solicitante">
+                  <ReviewRow label="Nome" value={ro.reporterName} />
+                  <ReviewRow label="Telefone" value={ro.reporterPhone} />
+                </ReviewSection>
+              )}
+
+              {/* Equipe */}
+              {(ro.agentParticipants ?? []).length > 0 && (
+                <ReviewSection title="Agentes Participantes">
+                  {(ro.agentParticipants ?? []).map(n => (
+                    <ReviewRow key={n} label="" value={AGENTS.find(a => a.name === n)?.display ?? n} />
+                  ))}
+                </ReviewSection>
+              )}
+
+              {/* Fotos */}
+              {ro.photos.length > 0 && (
+                <ReviewSection title="Fotos">
+                  <ReviewRow label="Total de fotos" value={`${ro.photos.length} foto(s)`} />
+                </ReviewSection>
+              )}
+
+              {/* Desfecho */}
+              {ro.conclusionStatus && (
+                <ReviewSection title="Desfecho">
+                  <ReviewRow label="Status" value={{ encaminhar: 'Encaminhar', arquivar: 'Arquivar / Finalizado', monitoramento: 'Monitoramento', '': '' }[ro.conclusionStatus] ?? ''} />
+                  {ro.conclusion && <ReviewRow label="Conclusão" value={ro.conclusion} />}
+                </ReviewSection>
+              )}
+
+              {/* Auto de Interdição */}
+              {ro.interdicao?.active && (
+                <ReviewSection title="Auto de Interdição">
+                  <ReviewRow label="Nº do Auto" value={ro.interdicao.numero} highlight />
+                  <ReviewRow label="Tipo" value={ro.interdicao.tipo === 'parcial' ? 'Parcial' : 'Total'} />
+                  {ro.interdicao.causas.length > 0 && <ReviewRow label="Causas" value={ro.interdicao.causas.join(', ')} />}
+                </ReviewSection>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+              <button type="button" onClick={() => { setShowReview(false); onSave(); }}
+                className="w-full py-4 rounded-2xl bg-green-600 text-white font-black text-sm flex items-center justify-center gap-2 active:opacity-80 shadow-lg">
+                <Check size={20} strokeWidth={3} /> Confirmar e Salvar R.O.
+              </button>
+              <button type="button" onClick={() => setShowReview(false)}
+                className="w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm">
+                Voltar e corrigir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal — erro de validação */}
       {validationError && (
@@ -2126,7 +2242,7 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
     acc[k] = (acc[k] ?? 0) + 1;
     return acc;
   }, {});
-  const topTypes = Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const topTypes = Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const byAgent = ros.reduce<Record<string, number>>((acc, r) => {
     if (!r.agent) return acc;
@@ -2135,7 +2251,24 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
     acc[k] = (acc[k] ?? 0) + 1;
     return acc;
   }, {});
-  const topAgents = Object.entries(byAgent).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const topAgents = Object.entries(byAgent).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const byNeighborhood = ros.reduce<Record<string, number>>((acc, r) => {
+    if (!r.neighborhood) return acc;
+    acc[r.neighborhood] = (acc[r.neighborhood] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topNeighborhoods = Object.entries(byNeighborhood).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Últimos 6 meses
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    const count = ros.filter(r => r.date.startsWith(key)).length;
+    return { key, label, count };
+  });
+  const maxMonth = Math.max(...last6Months.map(m => m.count), 1);
 
   const dk = darkMode;
   const modalBg  = dk ? 'bg-slate-800' : 'bg-white';
@@ -2244,8 +2377,8 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
 
       {/* Painel de Estatísticas */}
       {showStats && ros.length > 0 && (
-        <div className={cn('mx-4 mt-4 rounded-2xl border p-4 shadow-sm', statBg)}>
-          <div className="flex items-center justify-between mb-3">
+        <div className={cn('mx-4 mt-4 rounded-2xl border shadow-sm overflow-hidden', statBg)}>
+          <div className={cn('flex items-center justify-between px-4 pt-4 pb-3 border-b', dk ? 'border-slate-700' : 'border-gray-100')}>
             <div className="flex items-center gap-2">
               <BarChart2 size={16} className="text-orange-500" />
               <span className={cn('font-bold text-sm', dk ? 'text-slate-200' : 'text-gray-800')}>Estatísticas</span>
@@ -2255,53 +2388,92 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
             </button>
           </div>
 
-          {/* Totais rápidos */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {[
-              { label: 'Total', value: ros.length, color: 'text-blue-500' },
-              { label: 'Este mês', value: rosThisMonth.length, color: 'text-orange-500' },
-              { label: 'Concluídos', value: completed, color: 'text-green-500' },
-            ].map(s => (
-              <div key={s.label} className={cn('rounded-xl p-3 text-center', dk ? 'bg-slate-700' : 'bg-gray-50')}>
-                <p className={cn('text-2xl font-black', s.color)}>{s.value}</p>
-                <p className={cn('text-[10px] font-medium mt-0.5', mutedTxt)}>{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Top tipos */}
-          {topTypes.length > 0 && (
-            <div className="mb-3">
-              <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', mutedTxt)}>Tipos mais frequentes</p>
-              {topTypes.map(([label, count]) => (
-                <div key={label} className="flex items-center gap-2 mb-1.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between mb-0.5">
-                      <span className={cn('text-xs truncate', dk ? 'text-slate-300' : 'text-gray-700')}>{label}</span>
-                      <span className={cn('text-xs font-bold ml-2', dk ? 'text-slate-400' : 'text-gray-500')}>{count}</span>
-                    </div>
-                    <div className={cn('h-1.5 rounded-full overflow-hidden', dk ? 'bg-slate-600' : 'bg-gray-200')}>
-                      <div className="h-full bg-[#1B3A6B] rounded-full"
-                        style={{ width: `${Math.round((count / ros.length) * 100)}%` }} />
-                    </div>
-                  </div>
+          <div className="px-4 py-4 space-y-5">
+            {/* Totais rápidos */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Total', value: ros.length, color: 'text-[#1B3A6B]', bg: dk ? 'bg-slate-700' : 'bg-blue-50' },
+                { label: 'Este mês', value: rosThisMonth.length, color: 'text-orange-500', bg: dk ? 'bg-slate-700' : 'bg-orange-50' },
+                { label: 'Concluídos', value: completed, color: 'text-green-600', bg: dk ? 'bg-slate-700' : 'bg-green-50' },
+              ].map(s => (
+                <div key={s.label} className={cn('rounded-2xl p-3 text-center', s.bg)}>
+                  <p className={cn('text-3xl font-black', s.color)}>{s.value}</p>
+                  <p className={cn('text-[10px] font-semibold mt-0.5', mutedTxt)}>{s.label}</p>
                 </div>
               ))}
             </div>
-          )}
 
-          {/* Top agentes */}
-          {topAgents.length > 0 && (
+            {/* Gráfico — R.O.s por mês */}
             <div>
-              <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', mutedTxt)}>Agentes com mais registros</p>
-              {topAgents.map(([name, count]) => (
-                <div key={name} className="flex items-center justify-between py-1">
-                  <span className={cn('text-xs truncate flex-1', dk ? 'text-slate-300' : 'text-gray-700')}>{name}</span>
-                  <span className={cn('text-xs font-bold ml-2 px-2 py-0.5 rounded-full', dk ? 'bg-slate-700 text-orange-400' : 'bg-orange-100 text-orange-700')}>{count}</span>
-                </div>
-              ))}
+              <p className={cn('text-[10px] font-black uppercase tracking-wider mb-3', mutedTxt)}>R.O.s por mês (últimos 6 meses)</p>
+              <div className="flex items-end gap-1.5 h-20">
+                {last6Months.map(m => (
+                  <div key={m.key} className="flex-1 flex flex-col items-center gap-1">
+                    <span className={cn('text-[9px] font-bold', dk ? 'text-slate-400' : 'text-gray-500')}>{m.count > 0 ? m.count : ''}</span>
+                    <div className="w-full rounded-t-lg bg-[#1B3A6B] transition-all"
+                      style={{ height: `${Math.max(4, Math.round((m.count / maxMonth) * 56))}px`, opacity: m.count === 0 ? 0.2 : 1 }} />
+                    <span className={cn('text-[9px] font-medium capitalize', mutedTxt)}>{m.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+
+            {/* Top tipos */}
+            {topTypes.length > 0 && (
+              <div>
+                <p className={cn('text-[10px] font-black uppercase tracking-wider mb-2', mutedTxt)}>Tipos mais frequentes</p>
+                <div className="space-y-2">
+                  {topTypes.map(([label, count], i) => (
+                    <div key={label}>
+                      <div className="flex justify-between mb-0.5">
+                        <span className={cn('text-xs truncate flex-1 mr-2', dk ? 'text-slate-300' : 'text-gray-700')}>{label}</span>
+                        <span className={cn('text-xs font-black', dk ? 'text-slate-400' : 'text-gray-500')}>{count}</span>
+                      </div>
+                      <div className={cn('h-2 rounded-full overflow-hidden', dk ? 'bg-slate-700' : 'bg-gray-100')}>
+                        <div className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.round((count / ros.length) * 100)}%`,
+                            backgroundColor: ['#1B3A6B','#f97316','#22c55e','#8b5cf6','#ef4444'][i] ?? '#1B3A6B',
+                          }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top bairros */}
+            {topNeighborhoods.length > 0 && (
+              <div>
+                <p className={cn('text-[10px] font-black uppercase tracking-wider mb-2', mutedTxt)}>Bairros com mais ocorrências</p>
+                <div className="space-y-1.5">
+                  {topNeighborhoods.map(([name, count], i) => (
+                    <div key={name} className="flex items-center gap-2">
+                      <span className={cn('text-[10px] font-black w-4 text-center', dk ? 'text-slate-500' : 'text-gray-400')}>{i + 1}</span>
+                      <span className={cn('text-xs flex-1 truncate', dk ? 'text-slate-300' : 'text-gray-700')}>{name}</span>
+                      <span className={cn('text-xs font-black px-2 py-0.5 rounded-full', dk ? 'bg-slate-700 text-orange-400' : 'bg-orange-100 text-orange-700')}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top agentes */}
+            {topAgents.length > 0 && (
+              <div>
+                <p className={cn('text-[10px] font-black uppercase tracking-wider mb-2', mutedTxt)}>Agentes com mais registros</p>
+                <div className="space-y-1.5">
+                  {topAgents.map(([name, count], i) => (
+                    <div key={name} className="flex items-center gap-2">
+                      <span className={cn('text-[10px] font-black w-4 text-center', dk ? 'text-slate-500' : 'text-gray-400')}>{i + 1}</span>
+                      <span className={cn('text-xs flex-1 truncate', dk ? 'text-slate-300' : 'text-gray-700')}>{name}</span>
+                      <span className={cn('text-xs font-black px-2 py-0.5 rounded-full', dk ? 'bg-slate-700 text-blue-400' : 'bg-blue-100 text-[#1B3A6B]')}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
