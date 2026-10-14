@@ -338,17 +338,39 @@ function genId() {
 }
 
 async function nextRONumber(): Promise<string> {
-  const counterRef = doc(db, 'meta', 'counter');
-  return runTransaction(db, async t => {
-    const snap = await t.get(counterRef);
-    const fullYear = new Date().getFullYear().toString();
-    const yy = fullYear.slice(-2);
-    const storedYear = snap.data()?.year as string | undefined;
-    const isSameYear = storedYear === fullYear || storedYear === yy;
-    const n = isSameYear ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
-    t.set(counterRef, { year: fullYear, count: n });
-    return `${String(n).padStart(3, '0')}/${fullYear}`;
-  });
+  const fullYear = new Date().getFullYear().toString();
+
+  // Tenta transação online (garante número único entre os 27 aparelhos)
+  if (navigator.onLine) {
+    try {
+      const counterRef = doc(db, 'meta', 'counter');
+      return await runTransaction(db, async t => {
+        const snap = await t.get(counterRef);
+        const storedYear = snap.data()?.year as string | undefined;
+        const isSameYear = storedYear === fullYear || storedYear === fullYear.slice(-2);
+        const n = isSameYear ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
+        t.set(counterRef, { year: fullYear, count: n });
+        // Salva localmente para fallback offline
+        try { localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n })); } catch { /* noop */ }
+        return `${String(n).padStart(3, '0')}/${fullYear}`;
+      });
+    } catch {
+      // Transação falhou mesmo online — usa fallback local
+    }
+  }
+
+  // Fallback offline: gera número local provisório com sufixo "P" (Provisório)
+  // Ao voltar online o agente pode editar e salvar, atualizando o número definitivo
+  try {
+    const stored = localStorage.getItem('dc_counter');
+    const local = stored ? JSON.parse(stored) as { year: string; count: number } : null;
+    const isSameYear = local?.year === fullYear;
+    const n = isSameYear ? (local!.count + 1) : 1;
+    localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n }));
+    return `${String(n).padStart(3, '0')}P/${fullYear}`;
+  } catch {
+    return `OFFLINE/${fullYear}`;
+  }
 }
 
 function formatBRLInput(value: string): string {
@@ -3833,7 +3855,9 @@ export default function App() {
       updatedAt: now,
       editHistory: [...(currentRO.editHistory ?? []), historyEntry],
     };
-    await setDoc(doc(db, 'ros', saved.id), saved);
+    // setDoc com cache persistente grava no IndexedDB imediatamente (offline-safe)
+    // Não aguardamos — evita travar em áreas sem sinal
+    setDoc(doc(db, 'ros', saved.id), saved).catch(() => { /* sincroniza ao voltar online */ });
     setCurrentRO(saved);
     setScreen('view');
   }, [currentRO]);
@@ -3845,7 +3869,7 @@ export default function App() {
     }
     if (currentRO) {
       const draft = { ...currentRO, status: 'draft' as const };
-      await setDoc(doc(db, 'ros', draft.id), draft);
+      setDoc(doc(db, 'ros', draft.id), draft).catch(() => { /* sincroniza ao voltar online */ });
     }
     setScreen('home');
     setCurrentRO(null);
@@ -3891,8 +3915,14 @@ export default function App() {
     );
 
   const offlineBanner = !isOnline && (
-    <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-xs font-bold text-center py-1.5 no-print">
-      ⚠️ Sem conexão — dados salvos localmente
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-xs font-bold text-center py-2 no-print leading-tight">
+      ⚠️ Sem conexão — R.O.s salvos localmente e sincronizados ao voltar online
+    </div>
+  );
+
+  const provisorioBanner = currentRO?.roNumber?.includes('P/') && (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-orange-500 text-white text-xs font-bold text-center py-2 no-print leading-tight">
+      📋 Nº provisório ({currentRO.roNumber}) — será atualizado ao conectar
     </div>
   );
 
@@ -3900,7 +3930,7 @@ export default function App() {
     return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} />;
 
   if (screen === 'wizard' && currentRO)
-    return <>{offlineBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
+    return <>{offlineBanner}{provisorioBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
 
   if (screen === 'print' && currentRO)
     return <PrintScreen ro={currentRO} onClose={() => setScreen('view')} />;

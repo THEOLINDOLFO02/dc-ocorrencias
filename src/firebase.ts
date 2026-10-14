@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
+  persistentSingleTabManager,
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -18,9 +18,10 @@ const firebaseConfig = {
 export const app  = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Cache persistente no IndexedDB — suporta múltiplas abas e modo offline
+// persistentSingleTabManager: compatível com iOS Safari e todos os Android
+// Dados ficam no IndexedDB — persistem offline e sincronizam ao voltar online
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
+    tabManager: persistentSingleTabManager({ forceOwnership: true }),
   }),
 });
