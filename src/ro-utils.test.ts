@@ -5,6 +5,7 @@ import {
   getDefaultInterdicao,
   computeNextNumber,
   shouldUpdateInterdicaoNumber,
+  checkAgentAuthorizationPure,
   type CounterState,
 } from './ro-utils';
 
@@ -156,7 +157,50 @@ describe('shouldUpdateInterdicaoNumber — reconciliação do auto de interdiç�
   });
 
   it('atualiza quando o número do auto era idêntico ao roNumber provisório vazio', () => {
-    // O auto de interdição foi criado herdando o roNumber vazio e precisa ser corrigido
     expect(shouldUpdateInterdicaoNumber('', '')).toBe(true);
+  });
+});
+
+// ─── checkAgentAuthorizationPure ───────────────────────────────────────────
+
+describe('checkAgentAuthorizationPure — controle de identidade do agente', () => {
+  const profile = { uid: 'uid-abc', re: '20236' };
+
+  it('autoriza em modo legado quando perfil é null (conta compartilhada)', () => {
+    const result = checkAgentAuthorizationPure(null, '20236');
+    expect(result.authorized).toBe(true);
+    expect(result.isLegacyMode).toBe(true);
+  });
+
+  it('autoriza quando o perfil do Firebase coincide com o RE selecionado', () => {
+    const result = checkAgentAuthorizationPure(profile, '20236');
+    expect(result.authorized).toBe(true);
+    expect(result.isLegacyMode).toBe(false);
+  });
+
+  it('nega quando o perfil do Firebase diverge do RE selecionado (tentativa de usurpação)', () => {
+    const result = checkAgentAuthorizationPure(profile, '13606'); // RE de outro agente
+    expect(result.authorized).toBe(false);
+    expect(result.isLegacyMode).toBe(false);
+  });
+
+  it('nega mesmo se o RE selecionado for vazio', () => {
+    const result = checkAgentAuthorizationPure(profile, '');
+    expect(result.authorized).toBe(false);
+  });
+
+  it('modo legado nunca nega acesso (compatibilidade durante migração)', () => {
+    // Com perfil null, qualquer RE é aceito — o controle é feito apenas pelo PIN manual
+    const res1 = checkAgentAuthorizationPure(null, '99999');
+    const res2 = checkAgentAuthorizationPure(null, '');
+    expect(res1.authorized).toBe(true);
+    expect(res2.authorized).toBe(true);
+  });
+
+  it('isLegacyMode é false quando há perfil, independente de autorização', () => {
+    const denied = checkAgentAuthorizationPure(profile, '13606');
+    expect(denied.isLegacyMode).toBe(false);
+    const allowed = checkAgentAuthorizationPure(profile, '20236');
+    expect(allowed.isLegacyMode).toBe(false);
   });
 });

@@ -56,7 +56,6 @@ interface OccurrenceReport {
   id: string;
   roNumber: string;
   // Presente apenas em R.O.s criados offline antes de receber número definitivo.
-  // Quando needsNumber=true o roNumber fica vazio e é preenchido automaticamente ao voltar online.
   needsNumber?: boolean;
   emergency: boolean | null;
   vehicle: string;
@@ -67,6 +66,9 @@ interface OccurrenceReport {
   originText: string;
   agent: string;
   re: string;
+  // UID Firebase do agente que criou/editou o R.O. — campo autenticado verificável pelo servidor.
+  // Ausente em R.O.s históricos criados antes da migração para contas individuais.
+  authorUid?: string;
   reporterName: string;
   rgCpf: string;
   phone: string;
@@ -273,6 +275,63 @@ const toTitleCase = (s: string) =>
   s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
 interface Agent { name: string; display: string; re: string; role: string; }
+
+// ─────────────────────────────────────────────
+// PERFIL DE AGENTE — modelo de identidade individual
+// ─────────────────────────────────────────────
+
+/**
+ * Perfil armazenado em Firestore: /agentProfiles/{uid}
+ * Criado pelo admin; jamais pelo próprio agente.
+ * Vincula o UID Firebase (identidade autenticada) ao perfil operacional.
+ */
+export interface AgentProfile {
+  uid: string;
+  re: string;
+  name: string;
+  display: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Tenta carregar o perfil do agente autenticado a partir do Firestore.
+ * Retorna null se:
+ *   - o documento não existe (conta ainda não vinculada — migração pendente)
+ *   - ocorre erro de rede (offline)
+ *
+ * Nunca lança exceção — o chamador decide como lidar com perfil ausente.
+ */
+async function loadAgentProfile(uid: string): Promise<AgentProfile | null> {
+  try {
+    const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+    const snap = await getDoc(fsDoc(db, 'agentProfiles', uid));
+    if (!snap.exists()) return null;
+    return { uid, ...(snap.data() as Omit<AgentProfile, 'uid'>) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifica se o agente autenticado tem permissão para registrar um R.O.
+ * em nome do agente informado no formulário.
+ *
+ * Regras:
+ * - Se o perfil carregado do servidor coincide com o agente do formulário → autorizado
+ * - Se o perfil é null (conta compartilhada legada / perfil não criado) → autorizado com aviso
+ * - Se o perfil existe mas difere do agente selecionado → negado (tentativa de usurpação)
+ */
+export function checkAgentAuthorization(
+  profile: AgentProfile | null,
+  selectedRE: string,
+): { authorized: boolean; isLegacyMode: boolean } {
+  if (!profile) return { authorized: true, isLegacyMode: true };
+  if (profile.re === selectedRE) return { authorized: true, isLegacyMode: false };
+  return { authorized: false, isLegacyMode: false };
+}
+
 const AGENTS: Agent[] = [
   { name: 'AMERICO FERREIRA SOARES',               display: 'Américo Ferreira Soares',               re: '13606', role: 'Agente de Defesa Civil' },
   { name: 'ANDREA DE OLIVEIRA SOUZA',              display: 'Andrea de Oliveira Souza',              re: '20264', role: 'Agente de Defesa Civil' },
@@ -460,6 +519,7 @@ function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
     originText: raw.originText || '',
     agent: raw.agent || '',
     re: raw.re || '',
+    authorUid: raw.authorUid,   // undefined em R.O.s históricos — campo opcional para compatibilidade
     reporterName: raw.reporterName || '',
     rgCpf: raw.rgCpf || '',
     phone: raw.phone || '',
@@ -3618,12 +3678,18 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
 // LOGIN SCREEN
 // ─────────────────────────────────────────────
 
+// Email da conta compartilhada legada — mantido para compatibilidade durante a migração.
+// Após a migração para contas individuais, este valor não será mais usado no login.
 const TEAM_EMAIL = 'defesacivil0199@gmail.com';
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  // Modo legado: o agente deixa o email em branco e usa a conta compartilhada
+  const effectiveEmail = email.trim() || TEAM_EMAIL;
+  const isLegacyMode = !email.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3631,10 +3697,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, TEAM_EMAIL, password);
+      await signInWithEmailAndPassword(auth, effectiveEmail, password);
       onLogin();
     } catch {
-      setError('Senha incorreta. Verifique e tente novamente.');
+      setError(
+        isLegacyMode
+          ? 'Senha incorreta. Verifique e tente novamente.'
+          : 'Email ou senha incorretos. Verifique e tente novamente.',
+      );
     } finally {
       setLoading(false);
     }
@@ -3655,10 +3725,20 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-1">Conta da equipe</p>
-              <div className="px-4 py-3 bg-gray-100 rounded-xl text-sm text-gray-600 font-medium">
-                {TEAM_EMAIL}
-              </div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Email (opcional)</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError(''); }}
+                placeholder={`Deixe em branco para usar ${TEAM_EMAIL}`}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]"
+                autoComplete="email"
+              />
+              {isLegacyMode && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  Modo compartilhado — use seu email individual se disponível
+                </p>
+              )}
             </div>
 
             <div>
@@ -3667,7 +3747,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Digite a senha da equipe"
+                placeholder={isLegacyMode ? 'Senha da equipe' : 'Sua senha individual'}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]"
                 autoComplete="current-password"
               />
@@ -3700,9 +3780,25 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 // PIN SCREEN — identificação do agente pelo RE
 // ─────────────────────────────────────────────
 
-function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void; onCancel: () => void }) {
+function PinScreen({
+  onConfirm,
+  onCancel,
+  agentProfile,
+}: {
+  onConfirm: (agent: Agent) => void;
+  onCancel: () => void;
+  agentProfile: AgentProfile | null;
+}) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+
+  // Se o agente tem perfil vinculado, pré-confirma automaticamente sem PIN
+  // (a identidade já foi verificada pelo Firebase Authentication)
+  useEffect(() => {
+    if (!agentProfile) return;
+    const found = AGENTS.find(a => a.re === agentProfile.re);
+    if (found) onConfirm(found);
+  }, [agentProfile, onConfirm]);
 
   const handleConfirm = () => {
     const found = AGENTS.find(a => a.re === pin.trim());
@@ -3714,6 +3810,24 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
     onConfirm(found);
   };
 
+  // Com perfil individual: mostra tela de confirmação de identidade (sem campo de PIN)
+  if (agentProfile) {
+    return (
+      <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
+        <div style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} className="w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 border border-white/10">
+          <div className="text-center">
+            <div className="text-3xl mb-1">✅</div>
+            <h2 className="text-lg font-black text-[#1B3A6B] dark:text-blue-400">Identidade Confirmada</h2>
+            <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">{agentProfile.display}</p>
+            <p style={{ color: 'var(--text-muted)' }} className="text-xs mt-0.5">RE {agentProfile.re} · {agentProfile.role}</p>
+          </div>
+          <p className="text-xs text-center text-green-600">Iniciando R.O....</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Sem perfil individual: modo legado — digita RE manualmente
   return (
     <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
       <div style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} className="w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 border border-white/10">
@@ -3721,6 +3835,7 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
           <div className="text-3xl mb-1">🔶</div>
           <h2 className="text-lg font-black text-[#1B3A6B] dark:text-blue-400">Identificação</h2>
           <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">Digite seu número de RE para preencher o R.O.</p>
+          <p className="text-xs text-amber-500 mt-1">Conta compartilhada — a identificação individual não está disponível ainda</p>
         </div>
 
         <div className="space-y-2">
@@ -3765,14 +3880,22 @@ export default function App() {
   const [user, setUser] = useState<User | null | 'checking'>('checking');
   const [currentRO, setCurrentRO] = useState<OccurrenceReport | null>(null);
   const editMode = useRef(false);
-  // Snapshot do R.O. antes de entrar em modo de edição — usado para reverter no cancelamento
   const editSnapshot = useRef<OccurrenceReport | null>(null);
-  // Erro de sincronização com o servidor (não confundir com offline — o cache local persiste mesmo assim)
   const [syncError, setSyncError] = useState<string | null>(null);
+  // Perfil individual do agente autenticado (null = conta compartilhada legada ou perfil não criado)
+  const [agentProfile, setAgentProfile] = useState<AgentProfile | null>(null);
 
-  // ── Autenticação ──
+  // ── Autenticação — carrega perfil individual ao logar ──
   useEffect(() => {
-    return onAuthStateChanged(auth, u => setUser(u));
+    return onAuthStateChanged(auth, async u => {
+      setUser(u);
+      if (u) {
+        const profile = await loadAgentProfile(u.uid);
+        setAgentProfile(profile);
+      } else {
+        setAgentProfile(null);
+      }
+    });
   }, []);
 
   // ── Sincronização em tempo real via Firestore (só se autenticado) ──
@@ -3864,10 +3987,22 @@ export default function App() {
   };
 
   const handlePinConfirm = async (agentData: Agent) => {
-    // Cria o id definitivo ANTES de chamar nextRONumber, pois assignRONumber precisa
-    // que o documento já exista no Firestore para atualizar roNumber dentro da transação.
+    // Verifica se o agente autenticado tem autorização para registrar em nome de agentData.
+    // Em modo legado (conta compartilhada / perfil não criado) a operação prossegue com aviso.
+    const { authorized } = checkAgentAuthorization(agentProfile, agentData.re);
+    if (!authorized) {
+      // Não deve chegar aqui normalmente — PinScreen já filtra por AGENTS,
+      // mas se o perfil vinculado diverge, bloqueia antes de criar o documento.
+      setSyncError(
+        'Você não tem autorização para registrar um R.O. em nome deste agente. ' +
+        'Entre em contato com o administrador.',
+      );
+      return;
+    }
+
     const ro = createNewRO('');
     const { roNumber, needsNumber } = await nextRONumber(ro.id);
+    const currentUid = (user && user !== 'checking') ? user.uid : undefined;
     const initialRO: OccurrenceReport = {
       ...ro,
       roNumber,
@@ -3876,8 +4011,8 @@ export default function App() {
       re: agentData.re,
       role: agentData.role,
       agentLocked: true,
+      authorUid: currentUid,
     };
-    // Grava o rascunho inicial (sem número se offline) para que assignRONumber possa atualizar
     setDoc(doc(db, 'ros', initialRO.id), initialRO).catch(() => { /* cache local persiste */ });
     setCurrentRO(initialRO);
     setScreen('wizard');
@@ -3908,12 +4043,16 @@ export default function App() {
       ? (AGENTS.find(a => a.name === currentRO.agent)?.display ?? currentRO.agent)
       : 'Agente';
     const isEdit = editMode.current;
-    const historyEntry = { at: now, by: agentName, action: isEdit ? 'Editado' : 'Salvo' };
+    const currentUid = (user && user !== 'checking') ? user.uid : undefined;
+    // O campo uid no historyEntry permite auditoria: quem (UID Firebase) fez qual operação.
+    const historyEntry = { at: now, by: agentName, uid: currentUid, action: isEdit ? 'Editado' : 'Salvo' };
     const saved = {
       ...currentRO,
       endTime: currentRO.endTime || nowHHMM(),
       status: 'completed' as const,
       updatedAt: now,
+      // authorUid: preserva o UID de quem CRIOU o R.O.; ao editar, não sobrescreve
+      authorUid: currentRO.authorUid ?? currentUid,
       editHistory: [...(currentRO.editHistory ?? []), historyEntry],
     };
 
@@ -3930,7 +4069,7 @@ export default function App() {
     editMode.current = false;
     setCurrentRO(saved);
     setScreen('view');
-  }, [currentRO]);
+  }, [currentRO, user]);
 
   const handleCancel = useCallback(async () => {
     if (editMode.current && currentRO) {
@@ -4015,7 +4154,7 @@ export default function App() {
   );
 
   if (screen === 'pin')
-    return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} />;
+    return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} agentProfile={agentProfile} />;
 
   if (screen === 'wizard' && currentRO)
     return <>{offlineBanner}{provisorioBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;

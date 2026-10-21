@@ -113,6 +113,26 @@ export function buildOfflineRONumber(
   return { number: `${String(n).padStart(3, '0')}P/${fullYear}`, nextCount: n };
 }
 
+// ─── Identidade do agente — testável sem Firebase ───────────────────────────
+
+export interface AgentProfileLike {
+  uid: string;
+  re: string;
+}
+
+/**
+ * Verifica se o perfil Firebase autenticado autoriza registrar em nome do agente selecionado.
+ * Exportado para testes — espelha checkAgentAuthorization em App.tsx.
+ */
+export function checkAgentAuthorizationPure(
+  profile: AgentProfileLike | null,
+  selectedRE: string,
+): { authorized: boolean; isLegacyMode: boolean } {
+  if (!profile) return { authorized: true, isLegacyMode: true };
+  if (profile.re === selectedRE) return { authorized: true, isLegacyMode: false };
+  return { authorized: false, isLegacyMode: false };
+}
+
 // ─── Lógica de contador — testável sem Firebase ─────────────────────────────
 
 export interface CounterState {
