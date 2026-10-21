@@ -1,11 +1,117 @@
 rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regras Firestore — Defesa Civil Cajamar · Sistema de R.O.
+//
+// Modelo de acesso (Etapas 3 e 4):
+//   - Usuário autenticado   = qualquer UID com sessão Firebase válida
+//   - isAdmin               = UID da conta administrativa (não compartilhada com agentes)
+//   - isAgent               = autenticado E (tem perfil em /agentProfiles OU é isAdmin)
+//
+// ATENÇÃO: as funções helper não fazem leituras adicionais (elas só inspecionam
+// request.auth), exceto `hasProfile()` que lê /agentProfiles/{uid}.
+// Leituras em helpers são permitidas e não causam loop no Firestore.
+// ─────────────────────────────────────────────────────────────────────────────
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    // UID da conta administrativa (não usada por agentes comuns)
+    // Este UID deve ser atualizado se a conta admin for recriada.
+    // Após migração para contas individuais, nenhum agente terá este UID.
+    function adminUID() {
+      return "heEO6l4moPcnKoOmvgUlDAptSfX2";
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.uid == adminUID();
+    }
+
+    // Verifica se o usuário autenticado tem perfil de agente registrado
+    function hasProfile() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/agentProfiles/$(request.auth.uid));
+    }
+
+    // Agente válido: tem conta individual com perfil, ou é o admin
+    function isAgent() {
+      return isAdmin() || hasProfile();
+    }
+
+    // Impede que o cliente altere campos de autoria imutáveis após a criação
+    function authorFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['createdAt', 'id', 'authorUid']);
+    }
+
+    // Impede que editHistory seja reduzido ou sobrescrito (apenas append é permitido)
+    function historyNotShrunk() {
+      return request.resource.data.editHistory.size() >= resource.data.editHistory.size();
+    }
+
+    // ── /ros/{id} — Registros de Ocorrência ──────────────────────────────────
     match /ros/{id} {
-      allow read, write: if request.auth.uid == "heEO6l4moPcnKoOmvgUlDAptSfX2";
+      // Leitura: qualquer agente autenticado pode ler todos os R.O.s da equipe
+      allow read: if isAgent();
+
+      // Criação: agente pode criar; authorUid deve ser o próprio UID ou ausente (legado)
+      allow create: if isAgent() &&
+        (!request.resource.data.keys().hasAny(['authorUid']) ||
+          request.resource.data.authorUid == request.auth.uid ||
+          request.resource.data.authorUid == null);
+
+      // Atualização: agente pode editar; campos de autoria imutáveis são protegidos
+      allow update: if isAgent() &&
+        authorFieldsUnchanged() &&
+        historyNotShrunk();
+
+      // Exclusão: somente admin pode deletar R.O.s
+      allow delete: if isAdmin();
     }
+
+    // ── /meta/{id} — Contador de numeração ──────────────────────────────────
     match /meta/{id} {
-      allow read, write: if request.auth.uid == "heEO6l4moPcnKoOmvgUlDAptSfX2";
+      // Leitura: agente pode ler (necessário para a transação do contador)
+      allow read: if isAgent();
+
+      // Escrita no contador: somente via transação autenticada como agente
+      // O app garante que só /meta/counter é escrito por assignRONumber()
+      allow write: if isAgent();
     }
+
+    // ── /agentProfiles/{uid} — Perfis individuais dos agentes ────────────────
+    match /agentProfiles/{uid} {
+      // Agente lê apenas o próprio perfil; admin lê qualquer perfil
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == uid);
+
+      // Somente admin cria e modifica perfis — agente não pode alterar o próprio papel
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── /auditLog/{id} — Trilha de auditoria imutável ────────────────────────
+    // Entradas são append-only: criadas pelo app, nunca alteradas nem deletadas por clientes.
+    match /auditLog/{id} {
+      // Leitura: somente admin
+      allow read: if isAdmin();
+
+      // Criação: agente pode inserir (o app insere ao salvar R.O.)
+      // Nenhum campo pode ser omitido (ver estrutura em audit-log.ts)
+      allow create: if isAgent() &&
+        request.resource.data.keys().hasAll(['at', 'uid', 'action', 'roId']) &&
+        request.resource.data.uid == request.auth.uid;
+
+      // Update e delete: bloqueados para todos — auditoria é imutável
+      allow update, delete: if false;
+    }
+
+    // ── Tudo o mais — negado por padrão ──────────────────────────────────────
+    // (Firestore nega implicitamente qualquer coleção não listada,
+    //  mas declarar explicitamente torna a intenção clara.)
   }
 }

@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { writeAuditLog } from './audit-log';
 import {
   Camera, ChevronLeft, ChevronRight, Plus, Check,
   Trash2, X, Search, AlertTriangle, FileText, Clock, Printer, Pencil,
@@ -4014,6 +4015,16 @@ export default function App() {
       authorUid: currentUid,
     };
     setDoc(doc(db, 'ros', initialRO.id), initialRO).catch(() => { /* cache local persiste */ });
+    if (currentUid) {
+      writeAuditLog({
+        at: new Date().toISOString(),
+        uid: currentUid,
+        agentName: agentData.name,
+        action: 'ro_draft_created',
+        roId: initialRO.id,
+        roNumber: initialRO.roNumber || undefined,
+      });
+    }
     setCurrentRO(initialRO);
     setScreen('wizard');
   };
@@ -4067,6 +4078,16 @@ export default function App() {
     });
     editSnapshot.current = null;
     editMode.current = false;
+    if (currentUid) {
+      writeAuditLog({
+        at: now,
+        uid: currentUid,
+        agentName,
+        action: isEdit ? 'ro_edited' : 'ro_saved',
+        roId: saved.id,
+        roNumber: saved.roNumber || undefined,
+      });
+    }
     setCurrentRO(saved);
     setScreen('view');
   }, [currentRO, user]);
@@ -4101,7 +4122,19 @@ export default function App() {
   };
 
   const handleDelete = async (id: string) => {
+    const currentUid = (user && user !== 'checking') ? user.uid : undefined;
+    const ro = ros.find(r => r.id === id);
     await deleteDoc(doc(db, 'ros', id));
+    if (currentUid && ro) {
+      writeAuditLog({
+        at: new Date().toISOString(),
+        uid: currentUid,
+        agentName: ro.agent ?? 'Agente',
+        action: 'ro_deleted',
+        roId: id,
+        roNumber: ro.roNumber || undefined,
+      });
+    }
   };
   const handleDeleteAll = async () => {
     const batch = writeBatch(db);
