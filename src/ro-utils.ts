@@ -99,8 +99,9 @@ export function mergeInterdicao(
 }
 
 /**
- * Lógica de geração de número offline — testável sem Firebase.
- * Retorna { number, isProvisional } sem efeitos colaterais.
+ * @deprecated buildOfflineRONumber não é mais usado — o modo offline agora usa roNumber vazio
+ * com needsNumber=true e reconciliação automática ao voltar online. Mantido para compatibilidade
+ * com testes existentes até que sejam migrados.
  */
 export function buildOfflineRONumber(
   storedYear: string | null,
@@ -110,4 +111,39 @@ export function buildOfflineRONumber(
   const isSameYear = storedYear === fullYear;
   const n = isSameYear ? (storedCount ?? 0) + 1 : 1;
   return { number: `${String(n).padStart(3, '0')}P/${fullYear}`, nextCount: n };
+}
+
+// ─── Lógica de contador — testável sem Firebase ─────────────────────────────
+
+export interface CounterState {
+  year: string;   // 4 dígitos, ex: "2026"
+  count: number;
+}
+
+/**
+ * Calcula o próximo número de R.O. e o novo estado do contador, sem efeitos colaterais.
+ * Usado nos testes para verificar a lógica de virada de ano e incremento.
+ */
+export function computeNextNumber(
+  stored: CounterState | null,
+  fullYear: string,
+): { roNumber: string; newCounter: CounterState } {
+  const isSameYear = stored?.year === fullYear;
+  const n = isSameYear ? (stored!.count + 1) : 1;
+  return {
+    roNumber: `${String(n).padStart(3, '0')}/${fullYear}`,
+    newCounter: { year: fullYear, count: n },
+  };
+}
+
+/**
+ * Decide se um R.O. existente precisa ter seu número de auto de interdição atualizado
+ * após a reconciliação de número offline.
+ */
+export function shouldUpdateInterdicaoNumber(
+  currentInterdicaoNumero: string,
+  oldRoNumber: string,
+): boolean {
+  // Atualiza se o número do auto estava vazio ou era igual ao número provisório (vazio)
+  return !currentInterdicaoNumero || currentInterdicaoNumero === oldRoNumber;
 }

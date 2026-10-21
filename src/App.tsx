@@ -55,6 +55,9 @@ interface Losses {
 interface OccurrenceReport {
   id: string;
   roNumber: string;
+  // Presente apenas em R.O.s criados offline antes de receber número definitivo.
+  // Quando needsNumber=true o roNumber fica vazio e é preenchido automaticamente ao voltar online.
+  needsNumber?: boolean;
   emergency: boolean | null;
   vehicle: string;
   date: string;
@@ -337,40 +340,56 @@ function genId() {
   return Math.random().toString(36).slice(2, 11);
 }
 
-async function nextRONumber(): Promise<string> {
-  const fullYear = new Date().getFullYear().toString();
-
-  // Tenta transação online (garante número único entre os 27 aparelhos)
-  if (navigator.onLine) {
-    try {
-      const counterRef = doc(db, 'meta', 'counter');
-      return await runTransaction(db, async t => {
-        const snap = await t.get(counterRef);
-        const storedYear = snap.data()?.year as string | undefined;
-        const isSameYear = storedYear === fullYear || storedYear === fullYear.slice(-2);
-        const n = isSameYear ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
-        t.set(counterRef, { year: fullYear, count: n });
-        // Salva localmente para fallback offline
-        try { localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n })); } catch { /* noop */ }
-        return `${String(n).padStart(3, '0')}/${fullYear}`;
-      });
-    } catch {
-      // Transação falhou mesmo online — usa fallback local
-    }
-  }
-
-  // Fallback offline: gera número local provisório com sufixo "P" (Provisório)
-  // Ao voltar online o agente pode editar e salvar, atualizando o número definitivo
+/**
+ * Atribui o próximo número definitivo ao documento ros/{roId} via transação Firestore.
+ * - Idempotente: se o R.O. já tem número definitivo (needsNumber=false), retorna o existente.
+ * - Seguro contra concorrência: a transação lê e escreve o contador atomicamente.
+ * - Seguro contra virada de ano: compara sempre com fullYear de 4 dígitos.
+ * Retorna o número atribuído ou null em caso de falha (sem conexão ou erro do servidor).
+ */
+async function assignRONumber(roId: string, fullYear: string): Promise<string | null> {
   try {
-    const stored = localStorage.getItem('dc_counter');
-    const local = stored ? JSON.parse(stored) as { year: string; count: number } : null;
-    const isSameYear = local?.year === fullYear;
-    const n = isSameYear ? (local!.count + 1) : 1;
-    localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n }));
-    return `${String(n).padStart(3, '0')}P/${fullYear}`;
+    const counterRef = doc(db, 'meta', 'counter');
+    const roRef = doc(db, 'ros', roId);
+    return await runTransaction(db, async t => {
+      const [counterSnap, roSnap] = await Promise.all([t.get(counterRef), t.get(roRef)]);
+
+      // Idempotência: outro dispositivo já reconciliou este R.O. antes de nós
+      const roData = roSnap.data() as Partial<OccurrenceReport> | undefined;
+      if (roData?.roNumber && !roData.needsNumber) return roData.roNumber;
+
+      // Sempre 4 dígitos no ano para evitar ambiguidade "26" vs "2026"
+      const storedYear = counterSnap.data()?.year as string | undefined;
+      const isSameYear = storedYear === fullYear;
+      const n = isSameYear ? ((counterSnap.data()?.count as number) ?? 0) + 1 : 1;
+      const roNumber = `${String(n).padStart(3, '0')}/${fullYear}`;
+
+      t.set(counterRef, { year: fullYear, count: n });
+      // Atualiza o R.O. com o número definitivo dentro da mesma transação
+      t.update(roRef, { roNumber, needsNumber: false });
+
+      // Cache local: ajuda dispositivos offline a não reutilizarem sequências já usadas
+      try { localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n })); } catch { /* noop */ }
+
+      return roNumber;
+    });
   } catch {
-    return `OFFLINE/${fullYear}`;
+    return null;
   }
+}
+
+/**
+ * Prepara os campos de numeração ao criar um novo R.O.:
+ * - Online  → chama assignRONumber (número definitivo garantido pelo servidor)
+ * - Offline → roNumber vazio + needsNumber=true (reconciliado automaticamente ao voltar online)
+ */
+async function nextRONumber(roId: string): Promise<{ roNumber: string; needsNumber: boolean }> {
+  const fullYear = new Date().getFullYear().toString();
+  if (navigator.onLine) {
+    const roNumber = await assignRONumber(roId, fullYear);
+    if (roNumber) return { roNumber, needsNumber: false };
+  }
+  return { roNumber: '', needsNumber: true };
 }
 
 function formatBRLInput(value: string): string {
@@ -431,6 +450,7 @@ function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
   return {
     id: raw.id || genId(),
     roNumber,
+    needsNumber: raw.needsNumber ?? false,
     emergency: raw.emergency ?? null,
     vehicle: raw.vehicle || '',
     date: raw.date || todayISO(),
@@ -2536,7 +2556,9 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-                        <span className={cn('font-bold text-sm', numClr)}>R.O. {ro.roNumber}</span>
+                        <span className={cn('font-bold text-sm', numClr)}>
+                          {ro.needsNumber ? '⏳ Aguardando nº' : `R.O. ${ro.roNumber}`}
+                        </span>
                         <div className="flex gap-1.5">
                           {ro.conclusionStatus && (
                             <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-semibold', conclusionColors[ro.conclusionStatus] ?? '')}>
@@ -3797,7 +3819,30 @@ export default function App() {
   // ── Offline ──
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   useEffect(() => {
-    const on  = () => setIsOnline(true);
+    const on  = () => {
+      setIsOnline(true);
+      // Ao recuperar conexão, reconcilia R.O.s criados offline que ainda não têm número definitivo
+      const fullYear = new Date().getFullYear().toString();
+      setRos(prev => {
+        const pending = prev.filter(r => r.needsNumber);
+        pending.forEach(r => {
+          assignRONumber(r.id, fullYear).then(roNumber => {
+            if (!roNumber) return;
+            const patchRO = (ro: OccurrenceReport): OccurrenceReport => {
+              const updated = { ...ro, roNumber, needsNumber: false };
+              // Se o auto de interdição ainda usa o número provisório vazio, atualiza também
+              if (ro.interdicao && (!ro.interdicao.numero || ro.interdicao.numero === ro.roNumber)) {
+                updated.interdicao = { ...ro.interdicao, numero: roNumber };
+              }
+              return updated;
+            };
+            setRos(curr => curr.map(x => x.id === r.id ? patchRO(x) : x));
+            setCurrentRO(curr => curr?.id === r.id ? patchRO(curr) : curr);
+          });
+        });
+        return prev; // sem mudança imediata; as atualizações chegam pelas promises acima
+      });
+    };
     const off = () => setIsOnline(false);
     window.addEventListener('online',  on);
     window.addEventListener('offline', off);
@@ -3819,9 +3864,22 @@ export default function App() {
   };
 
   const handlePinConfirm = async (agentData: Agent) => {
-    const roNumber = await nextRONumber();
-    const ro = createNewRO(roNumber);
-    setCurrentRO({ ...ro, agent: agentData.name, re: agentData.re, role: agentData.role, agentLocked: true });
+    // Cria o id definitivo ANTES de chamar nextRONumber, pois assignRONumber precisa
+    // que o documento já exista no Firestore para atualizar roNumber dentro da transação.
+    const ro = createNewRO('');
+    const { roNumber, needsNumber } = await nextRONumber(ro.id);
+    const initialRO: OccurrenceReport = {
+      ...ro,
+      roNumber,
+      needsNumber,
+      agent: agentData.name,
+      re: agentData.re,
+      role: agentData.role,
+      agentLocked: true,
+    };
+    // Grava o rascunho inicial (sem número se offline) para que assignRONumber possa atualizar
+    setDoc(doc(db, 'ros', initialRO.id), initialRO).catch(() => { /* cache local persiste */ });
+    setCurrentRO(initialRO);
     setScreen('wizard');
   };
 
@@ -3940,9 +3998,9 @@ export default function App() {
     </div>
   );
 
-  const provisorioBanner = currentRO?.roNumber?.includes('P/') && (
+  const provisorioBanner = currentRO?.needsNumber && (
     <div className="fixed top-0 left-0 right-0 z-[100] bg-orange-500 text-white text-xs font-bold text-center py-2 no-print leading-tight">
-      📋 Nº provisório ({currentRO.roNumber}) — será atualizado ao conectar
+      📋 Sem conexão — número do R.O. será atribuído ao voltar online
     </div>
   );
 
