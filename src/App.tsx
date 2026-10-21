@@ -426,7 +426,7 @@ function getDefaultInterdicao(roNumber = ''): OccurrenceReport['interdicao'] {
 function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
   const roNumber = raw.roNumber || '';
   const defInterdicao = getDefaultInterdicao(roNumber);
-  const rawInterdicao = raw.interdicao || {};
+  const rawInterdicao = (raw.interdicao || {}) as Partial<OccurrenceReport['interdicao']>;
 
   return {
     id: raw.id || genId(),
@@ -2090,7 +2090,6 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
               <ReviewSection title="Endereço">
                 <ReviewRow label="Logradouro" value={[ro.address, ro.addressNumber].filter(Boolean).join(', ')} />
                 <ReviewRow label="Bairro" value={ro.neighborhood} />
-                {ro.complement && <ReviewRow label="Complemento" value={ro.complement} />}
               </ReviewSection>
 
               {/* Ocorrência */}
@@ -2100,10 +2099,10 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
               </ReviewSection>
 
               {/* Solicitante */}
-              {(ro.reporterName || ro.reporterPhone) && (
+              {(ro.reporterName || ro.phone) && (
                 <ReviewSection title="Solicitante">
                   <ReviewRow label="Nome" value={ro.reporterName} />
-                  <ReviewRow label="Telefone" value={ro.reporterPhone} />
+                  <ReviewRow label="Telefone" value={ro.phone} />
                 </ReviewSection>
               )}
 
@@ -2892,8 +2891,8 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
     <td colSpan={colSpan} className={cn('border border-gray-500 px-1.5 py-1 align-top text-[10px]', className)}>{children}</td>
   );
 
-  const TLabel = ({ children }: { children: React.ReactNode }) => (
-    <span className="font-bold text-[9px] uppercase block leading-tight text-gray-600">{children}</span>
+  const TLabel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <span className={`font-bold text-[9px] uppercase block leading-tight text-gray-600${className ? ' ' + className : ''}`}>{children}</span>
   );
 
   const TValue = ({ children, className: cls }: { children: React.ReactNode; className?: string }) => (
@@ -3744,6 +3743,10 @@ export default function App() {
   const [user, setUser] = useState<User | null | 'checking'>('checking');
   const [currentRO, setCurrentRO] = useState<OccurrenceReport | null>(null);
   const editMode = useRef(false);
+  // Snapshot do R.O. antes de entrar em modo de edição — usado para reverter no cancelamento
+  const editSnapshot = useRef<OccurrenceReport | null>(null);
+  // Erro de sincronização com o servidor (não confundir com offline — o cache local persiste mesmo assim)
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // ── Autenticação ──
   useEffect(() => {
@@ -3855,30 +3858,47 @@ export default function App() {
       updatedAt: now,
       editHistory: [...(currentRO.editHistory ?? []), historyEntry],
     };
-    // setDoc com cache persistente grava no IndexedDB imediatamente (offline-safe)
-    // Não aguardamos — evita travar em áreas sem sinal
-    setDoc(doc(db, 'ros', saved.id), saved).catch(() => { /* sincroniza ao voltar online */ });
+
+    // O cache persistente grava no IndexedDB imediatamente (offline-safe).
+    // Não bloqueamos a UI, mas capturamos erros do servidor (regra de segurança, dado inválido, etc.)
+    setSyncError(null);
+    setDoc(doc(db, 'ros', saved.id), saved).catch(() => {
+      setSyncError(
+        'Não foi possível confirmar o salvamento no servidor. ' +
+        'Os dados foram preservados localmente e serão sincronizados quando a conexão for restabelecida.',
+      );
+    });
+    editSnapshot.current = null;
+    editMode.current = false;
     setCurrentRO(saved);
     setScreen('view');
   }, [currentRO]);
 
   const handleCancel = useCallback(async () => {
     if (editMode.current && currentRO) {
+      // Reverte para o snapshot salvo antes da edição, evitando mostrar dados não persistidos
+      const snapshot = editSnapshot.current;
+      editMode.current = false;
+      editSnapshot.current = null;
+      setCurrentRO(snapshot ?? currentRO);
       setScreen('view');
       return;
     }
-    if (currentRO) {
-      const draft = { ...currentRO, status: 'draft' as const };
-      setDoc(doc(db, 'ros', draft.id), draft).catch(() => { /* sincroniza ao voltar online */ });
-    }
-    setScreen('home');
+    // Novo R.O. — descarta sem gravar rascunho (o agente escolheu cancelar)
     setCurrentRO(null);
+    setScreen('home');
   }, [currentRO]);
 
   const handleView = (ro: OccurrenceReport) => { setCurrentRO(normalizeRO(ro)); setScreen('view'); };
   const handleBack = () => { setScreen('home'); setCurrentRO(null); };
   const handleEdit = () => {
-    setCurrentRO(prev => prev ? normalizeRO(prev) : null);
+    setCurrentRO(prev => {
+      if (!prev) return null;
+      const normalized = normalizeRO(prev);
+      // Guarda snapshot para reverter se o agente cancelar a edição
+      editSnapshot.current = normalized;
+      return normalized;
+    });
     editMode.current = true;
     setScreen('wizard');
   };
@@ -3926,6 +3946,16 @@ export default function App() {
     </div>
   );
 
+  const syncErrorBanner = syncError && (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-2 px-4 no-print leading-tight flex items-center justify-between gap-2">
+      <span>⚠️ {syncError}</span>
+      <button type="button" onClick={() => setSyncError(null)}
+        className="shrink-0 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white">
+        <X size={12} />
+      </button>
+    </div>
+  );
+
   if (screen === 'pin')
     return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} />;
 
@@ -3936,7 +3966,7 @@ export default function App() {
     return <PrintScreen ro={currentRO} onClose={() => setScreen('view')} />;
 
   if (screen === 'view' && currentRO)
-    return <>{offlineBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} /></>;
+    return <>{offlineBanner}{syncErrorBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} /></>;
 
   return <>{offlineBanner}<HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll}
     darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} onSignOut={() => signOut(auth)} /></>;
