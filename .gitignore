@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Artefatos temporários de auditoria
+*.diff
+*.zip
+pacote-auditoria*

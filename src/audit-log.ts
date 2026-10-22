@@ -1,50 +1,54 @@
-/**
- * Trilha de auditoria em /auditLog/{id} — coleção separada, append-only.
- *
- * Por que separada do editHistory no documento?
- * editHistory é um array dentro do próprio R.O.: qualquer setDoc() com o array
- * reduzido ou vazio o sobrescreve silenciosamente. A coleção /auditLog não pode
- * ser alterada nem deletada por clientes (regra: allow update, delete: if false).
- *
- * O que é registrado:
- *   - Criação de R.O. (novo rascunho inicial)
- *   - Salvamento como concluído
- *   - Edição de R.O. existente
- *   - Atribuição de número definitivo (reconciliação offline)
- *
- * O que NÃO é registrado aqui (faz parte do próprio R.O.):
- *   - Alterações de campo individuais (inviável no modelo atual sem diff)
- */
-
-import { collection, addDoc } from 'firebase/firestore';
+import { doc, type Firestore, type WriteBatch } from 'firebase/firestore';
 import { db } from './firebase';
 
-export type AuditAction =
-  | 'ro_draft_created'
-  | 'ro_saved'
-  | 'ro_edited'
-  | 'ro_number_assigned'
-  | 'ro_deleted';
+export const AUDIT_ACTIONS = [
+  'ro_draft_created',
+  'ro_draft_updated',
+  'ro_saved',
+  'ro_edited',
+  'ro_number_assigned',
+  'ro_deleted',
+] as const;
+
+export type AuditAction = typeof AUDIT_ACTIONS[number];
 
 export interface AuditEntry {
-  at: string;          // ISO timestamp
-  uid: string;         // UID Firebase do usuário que executou a ação
-  agentName: string;   // Nome do agente operacional (campo operacional, não de autoria)
+  id: string;
+  at: string;
+  uid: string;
+  agentName: string;
   action: AuditAction;
-  roId: string;        // ID do documento /ros/{id}
-  roNumber?: string;   // Número do R.O. no momento da ação (vazio se ainda não atribuído)
-  detail?: string;     // Informação adicional opcional
+  roId: string;
+  roNumber?: string;
+  detail?: string;
 }
 
-/**
- * Insere uma entrada de auditoria.
- * Falhas são suprimidas — a auditoria não deve bloquear o fluxo principal.
- * A regra Firestore garante que uid == request.auth.uid, então forjar a entrada é impossível.
- */
-export async function writeAuditLog(entry: AuditEntry): Promise<void> {
-  try {
-    await addDoc(collection(db, 'auditLog'), entry);
-  } catch {
-    // Falha silenciosa — log de auditoria não deve travar a operação principal
+type AuditInput = Omit<AuditEntry, 'id'>;
+
+const ACTION_SET = new Set<string>(AUDIT_ACTIONS);
+
+export function validateAuditInput(input: AuditInput): void {
+  if (!input.uid.trim()) throw new Error('Auditoria sem UID autenticado.');
+  if (!input.agentName.trim()) throw new Error('Auditoria sem identificação do agente.');
+  if (!input.roId.trim()) throw new Error('Auditoria sem identificador do R.O.');
+  if (!Number.isFinite(Date.parse(input.at))) throw new Error('Data inválida na auditoria.');
+  if (!ACTION_SET.has(input.action)) throw new Error('Ação de auditoria não permitida.');
+  if (input.roNumber !== undefined && typeof input.roNumber !== 'string') {
+    throw new Error('Número de R.O. inválido na auditoria.');
   }
+  if (input.detail !== undefined && typeof input.detail !== 'string') {
+    throw new Error('Detalhe inválido na auditoria.');
+  }
+}
+
+export function createAuditEntry(input: AuditInput): AuditEntry {
+  validateAuditInput(input);
+  const id = globalThis.crypto?.randomUUID?.() ?? `audit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return { id, ...input };
+}
+
+export function addAuditToBatch(batch: WriteBatch, entry: AuditEntry, firestore: Firestore = db): void {
+  const { id, ...data } = entry;
+  validateAuditInput(data);
+  batch.set(doc(firestore, 'auditLog', id), data);
 }

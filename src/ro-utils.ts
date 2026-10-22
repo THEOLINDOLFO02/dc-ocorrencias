@@ -118,19 +118,40 @@ export function buildOfflineRONumber(
 export interface AgentProfileLike {
   uid: string;
   re: string;
+  name?: string;
+  display?: string;
+  role?: string;
 }
+
+export type AgentIdentityState =
+  | { status: 'individual'; profile: AgentProfileLike }
+  | { status: 'legacy'; email: string }
+  | { status: 'unverified'; reason: 'missing-profile' | 'profile-unavailable' };
 
 /**
  * Verifica se o perfil Firebase autenticado autoriza registrar em nome do agente selecionado.
  * Exportado para testes — espelha checkAgentAuthorization em App.tsx.
  */
 export function checkAgentAuthorizationPure(
-  profile: AgentProfileLike | null,
+  identity: AgentIdentityState,
   selectedRE: string,
-): { authorized: boolean; isLegacyMode: boolean } {
-  if (!profile) return { authorized: true, isLegacyMode: true };
-  if (profile.re === selectedRE) return { authorized: true, isLegacyMode: false };
-  return { authorized: false, isLegacyMode: false };
+): { authorized: boolean; reason: string | null } {
+  if (identity.status === 'individual') {
+    return identity.profile.re === selectedRE
+      ? { authorized: true, reason: null }
+      : { authorized: false, reason: 'O perfil autenticado não corresponde ao RE selecionado.' };
+  }
+  if (identity.status === 'legacy') {
+    return selectedRE
+      ? { authorized: true, reason: null }
+      : { authorized: false, reason: 'Selecione o servidor responsável.' };
+  }
+  return {
+    authorized: false,
+    reason: identity.reason === 'profile-unavailable'
+      ? 'Não foi possível verificar sua identidade. Conecte-se e tente novamente.'
+      : 'Esta conta não possui perfil individual autorizado.',
+  };
 }
 
 // ─── Lógica de contador — testável sem Firebase ─────────────────────────────
@@ -148,6 +169,13 @@ export function computeNextNumber(
   stored: CounterState | null,
   fullYear: string,
 ): { roNumber: string; newCounter: CounterState } {
+  if (!/^\d{4}$/.test(fullYear)) throw new Error('Ano inválido para numeração do R.O.');
+  if (stored && (!/^\d{4}$/.test(stored.year) || !Number.isSafeInteger(stored.count) || stored.count < 0)) {
+    throw new Error('Contador armazenado inválido; numeração interrompida para evitar duplicidade.');
+  }
+  if (stored && Number(fullYear) < Number(stored.year)) {
+    throw new Error('Ano de numeração anterior ao contador armazenado; regressão bloqueada.');
+  }
   const isSameYear = stored?.year === fullYear;
   const n = isSameYear ? (stored!.count + 1) : 1;
   return {

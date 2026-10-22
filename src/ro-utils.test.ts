@@ -109,9 +109,16 @@ describe('computeNextNumber — lógica do contador definitivo', () => {
   it('não aceita ano com 2 dígitos como equivalente (sem ambiguidade)', () => {
     // "26" !== "2026" — comparação deve ser estrita com 4 dígitos
     const stored: CounterState = { year: '26', count: 5 };
-    const { roNumber } = computeNextNumber(stored, '2026');
-    // Como "26" !== "2026", reinicia para 001
-    expect(roNumber).toBe('001/2026');
+    expect(() => computeNextNumber(stored, '2026')).toThrow('Contador armazenado inválido');
+  });
+
+  it('rejeita contador inválido em vez de reiniciar e arriscar duplicidade', () => {
+    expect(() => computeNextNumber({ year: '2026', count: -1 }, '2026')).toThrow('Contador armazenado inválido');
+    expect(() => computeNextNumber({ year: '2026', count: 1.5 }, '2026')).toThrow('Contador armazenado inválido');
+  });
+
+  it('bloqueia regressão do ano em relação ao contador persistido', () => {
+    expect(() => computeNextNumber({ year: '2026', count: 10 }, '2025')).toThrow('regressão bloqueada');
   });
 
   it('zero-pad até 3 dígitos', () => {
@@ -166,41 +173,38 @@ describe('shouldUpdateInterdicaoNumber — reconciliação do auto de interdiç�
 describe('checkAgentAuthorizationPure — controle de identidade do agente', () => {
   const profile = { uid: 'uid-abc', re: '20236' };
 
-  it('autoriza em modo legado quando perfil é null (conta compartilhada)', () => {
-    const result = checkAgentAuthorizationPure(null, '20236');
+  it('autoriza explicitamente a conta legada para uso operacional', () => {
+    const result = checkAgentAuthorizationPure({ status: 'legacy', email: 'defesacivil0199@gmail.com' }, '20236');
     expect(result.authorized).toBe(true);
-    expect(result.isLegacyMode).toBe(true);
+    expect(result.reason).toBeNull();
   });
 
   it('autoriza quando o perfil do Firebase coincide com o RE selecionado', () => {
-    const result = checkAgentAuthorizationPure(profile, '20236');
+    const result = checkAgentAuthorizationPure({ status: 'individual', profile }, '20236');
     expect(result.authorized).toBe(true);
-    expect(result.isLegacyMode).toBe(false);
+    expect(result.reason).toBeNull();
   });
 
   it('nega quando o perfil do Firebase diverge do RE selecionado (tentativa de usurpação)', () => {
-    const result = checkAgentAuthorizationPure(profile, '13606'); // RE de outro agente
+    const result = checkAgentAuthorizationPure({ status: 'individual', profile }, '13606'); // RE de outro agente
     expect(result.authorized).toBe(false);
-    expect(result.isLegacyMode).toBe(false);
+    expect(result.reason).toContain('não corresponde');
   });
 
   it('nega mesmo se o RE selecionado for vazio', () => {
-    const result = checkAgentAuthorizationPure(profile, '');
+    const result = checkAgentAuthorizationPure({ status: 'individual', profile }, '');
     expect(result.authorized).toBe(false);
   });
 
-  it('modo legado nunca nega acesso (compatibilidade durante migração)', () => {
-    // Com perfil null, qualquer RE é aceito — o controle é feito apenas pelo PIN manual
-    const res1 = checkAgentAuthorizationPure(null, '99999');
-    const res2 = checkAgentAuthorizationPure(null, '');
-    expect(res1.authorized).toBe(true);
-    expect(res2.authorized).toBe(true);
+  it('não autoriza identidade não verificada após erro de rede', () => {
+    const result = checkAgentAuthorizationPure({ status: 'unverified', reason: 'profile-unavailable' }, '20236');
+    expect(result.authorized).toBe(false);
+    expect(result.reason).toContain('Conecte-se');
   });
 
-  it('isLegacyMode é false quando há perfil, independente de autorização', () => {
-    const denied = checkAgentAuthorizationPure(profile, '13606');
-    expect(denied.isLegacyMode).toBe(false);
-    const allowed = checkAgentAuthorizationPure(profile, '20236');
-    expect(allowed.isLegacyMode).toBe(false);
+  it('não autoriza conta sem perfil individual e que não é a conta legada', () => {
+    const result = checkAgentAuthorizationPure({ status: 'unverified', reason: 'missing-profile' }, '20236');
+    expect(result.authorized).toBe(false);
+    expect(result.reason).toContain('não possui perfil');
   });
 });
