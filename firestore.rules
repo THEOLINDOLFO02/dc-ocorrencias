@@ -1,11 +1,167 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /ros/{id} {
-      allow read, write: if request.auth.uid == "heEO6l4moPcnKoOmvgUlDAptSfX2";
+    function isAuthenticated() {
+      return request.auth != null;
     }
+
+    // Administrative access must be provisioned as a trusted custom claim.
+    // No fixed UID (including the legacy shared account UID) grants admin rights.
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.keys().hasAny(['admin']) &&
+        request.auth.token.admin == true;
+    }
+
+    function isLegacyAccount() {
+      return isAuthenticated() &&
+        request.auth.token.keys().hasAny(['email']) &&
+        request.auth.token.email == 'defesacivil0199@gmail.com';
+    }
+
+    function currentLocalYear() {
+      // Cajamar uses UTC-3; derive the calendar year from server time, not device clock.
+      return string(timestamp.value(request.time.toMillis() - 10800000).year());
+    }
+
+    function hasAgentProfile() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/agentProfiles/$(request.auth.uid));
+    }
+
+    function isAgent() {
+      return isAdmin() || isLegacyAccount() || hasAgentProfile();
+    }
+
+    function profileMatchesRO() {
+      return isAdmin() || isLegacyAccount() ||
+        (hasAgentProfile() &&
+          request.resource.data.re ==
+            get(/databases/$(database)/documents/agentProfiles/$(request.auth.uid)).data.re);
+    }
+
+    function immutableROFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['createdAt', 'id', 'authorUid', 'agent', 're', 'editHistory']);
+    }
+
+    function auditMatches(auditId, roId, allowedActions) {
+      let event = getAfter(/databases/$(database)/documents/auditLog/$(auditId));
+      return auditId is string && auditId.size() > 0 &&
+        event.data.uid == request.auth.uid &&
+        event.data.roId == roId &&
+        allowedActions.hasAny([event.data.action]);
+    }
+
+    function validAuditAfter(roId, allowedActions) {
+      return auditMatches(request.resource.data.lastAuditId, roId, allowedActions);
+    }
+
+    function numberMatchesCounter(number, year, count) {
+      let parts = number.split('/');
+      let ordinal = parts[0];
+      return count is int && count > 0 &&
+        parts.size() == 2 && parts[1] == year &&
+        ordinal.matches('^[0-9]{3,}$') && int(ordinal) == count &&
+        ((count < 1000 && ordinal.size() == 3) ||
+          (count >= 1000 && ordinal == string(count)));
+    }
+
+    function validNumberAssignment(roId) {
+      let counter = getAfter(/databases/$(database)/documents/meta/counter);
+      return resource.data.needsNumber == true &&
+        request.resource.data.needsNumber == false &&
+        request.resource.data.roNumber is string &&
+        numberMatchesCounter(request.resource.data.roNumber, counter.data.year, counter.data.count) &&
+        counter.data.year == currentLocalYear() &&
+        counter.data.lastRoId == roId &&
+        counter.data.lastRoNumber == request.resource.data.roNumber &&
+        validAuditAfter(roId, ['ro_number_assigned']);
+    }
+
+    function validCounterPayload(roId) {
+      let number = request.resource.data.lastRoNumber;
+      let before = get(/databases/$(database)/documents/ros/$(roId));
+      let after = getAfter(/databases/$(database)/documents/ros/$(roId));
+      return request.resource.data.keys().hasAll(['year', 'count', 'lastRoId', 'lastRoNumber']) &&
+        request.resource.data.keys().hasOnly(['year', 'count', 'lastRoId', 'lastRoNumber']) &&
+        request.resource.data.year is string && request.resource.data.year.matches('^[0-9]{4}$') &&
+        request.resource.data.year == currentLocalYear() &&
+        request.resource.data.count is int && request.resource.data.count > 0 &&
+        request.resource.data.lastRoId is string && request.resource.data.lastRoId.size() > 0 &&
+        number is string && numberMatchesCounter(number, request.resource.data.year, request.resource.data.count) &&
+        before.data.needsNumber == true && after.data.needsNumber == false &&
+        after.data.roNumber == number && after.data.lastAuditId is string &&
+        auditMatches(after.data.lastAuditId, roId, ['ro_number_assigned']);
+    }
+
+    match /ros/{id} {
+      allow read: if isAgent();
+
+      // New documents require authenticated authorship and an atomic audit entry.
+      // Older R.O.s without these fields remain readable and editable without
+      // retroactively assigning authorship.
+      allow create: if isAgent() &&
+        request.resource.data.keys().hasAll(['id', 'createdAt', 'authorUid', 're', 'editHistory', 'lastAuditId']) &&
+        request.resource.data.id == id &&
+        request.resource.data.authorUid == request.auth.uid &&
+        request.resource.data.editHistory is list && request.resource.data.editHistory.size() == 0 &&
+        profileMatchesRO() &&
+        validAuditAfter(id, ['ro_draft_created', 'ro_saved']);
+
+      allow update: if isAgent() &&
+        immutableROFieldsUnchanged() &&
+        (
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['roNumber', 'needsNumber']) &&
+            validAuditAfter(id, ['ro_saved', 'ro_edited', 'ro_draft_updated'])) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasAll(['roNumber', 'needsNumber', 'lastAuditId']) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roNumber', 'needsNumber', 'lastAuditId']) &&
+            validNumberAssignment(id))
+        );
+
+      allow delete: if isAdmin();
+    }
+
     match /meta/{id} {
-      allow read, write: if request.auth.uid == "heEO6l4moPcnKoOmvgUlDAptSfX2";
+      allow read: if isAgent();
+      allow create: if isAgent() && id == 'counter' &&
+        request.resource.data.count == 1 &&
+        validCounterPayload(request.resource.data.lastRoId);
+      allow update: if isAgent() && id == 'counter' &&
+        (
+          (request.resource.data.year == resource.data.year &&
+            request.resource.data.count == resource.data.count + 1) ||
+          (int(request.resource.data.year) > int(resource.data.year) &&
+            request.resource.data.year == currentLocalYear() && request.resource.data.count == 1)
+        ) && validCounterPayload(request.resource.data.lastRoId);
+      allow delete: if false;
+    }
+
+    match /agentProfiles/{uid} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == uid);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /auditLog/{id} {
+      allow read: if isAgent();
+      allow create: if isAgent() &&
+        request.resource.data.keys().hasAll(['at', 'uid', 'agentName', 'action', 'roId']) &&
+        request.resource.data.keys().hasOnly(['at', 'uid', 'agentName', 'action', 'roId', 'roNumber', 'detail']) &&
+        request.resource.data.at is string &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.agentName is string && request.resource.data.agentName.size() > 0 &&
+        request.resource.data.roId is string && request.resource.data.roId.size() > 0 &&
+        request.resource.data.action in ['ro_draft_created', 'ro_draft_updated', 'ro_saved', 'ro_edited', 'ro_number_assigned', 'ro_deleted'] &&
+        (!request.resource.data.keys().hasAny(['roNumber']) || request.resource.data.roNumber is string) &&
+        (!request.resource.data.keys().hasAny(['detail']) || request.resource.data.detail is string) &&
+        (
+          (request.resource.data.action in ['ro_draft_created', 'ro_draft_updated', 'ro_saved', 'ro_edited', 'ro_number_assigned'] &&
+            getAfter(/databases/$(database)/documents/ros/$(request.resource.data.roId)).data.lastAuditId == id) ||
+          (request.resource.data.action == 'ro_deleted' && isAdmin() &&
+            exists(/databases/$(database)/documents/ros/$(request.resource.data.roId)) &&
+            !existsAfter(/databases/$(database)/documents/ros/$(request.resource.data.roId)))
+        );
+      allow update, delete: if false;
     }
   }
 }

@@ -1,0 +1,48 @@
+name: PR Validation
+
+on:
+  push:
+    branches:
+      - fix/firestore-security
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: Lint · Build · Unit and Firestore Rules Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Firestore rules tests in isolated demo project
+        run: npm run test:rules
+
+      - name: Dependency audit (informational)
+        run: npm audit --audit-level=high
+        continue-on-error: true

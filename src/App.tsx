@@ -3,11 +3,16 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  collection, doc, setDoc, deleteDoc, onSnapshot,
-  runTransaction, writeBatch, query, orderBy,
+  collection, doc, onSnapshot,
+  writeBatch, query, orderBy, where, getDoc, getDocFromServer,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { addAuditToBatch, createAuditEntry, type AuditEntry } from './audit-log';
+import { assignRONumber } from './ro-numbering';
+import { BulkDeleteError, deleteROsInChunks } from './ro-delete';
+import { acknowledgeRecoveryStep, acknowledgeRecoveryThrough, listRecoveryRecords, saveRecoveryRecord, type RecoveryRecord } from './sync-recovery';
+import { checkAgentAuthorizationPure, type AgentIdentityState } from './ro-utils';
 import {
   Camera, ChevronLeft, ChevronRight, Plus, Check,
   Trash2, X, Search, AlertTriangle, FileText, Clock, Printer, Pencil,
@@ -55,6 +60,8 @@ interface Losses {
 interface OccurrenceReport {
   id: string;
   roNumber: string;
+  // Presente apenas em R.O.s criados offline antes de receber número definitivo.
+  needsNumber?: boolean;
   emergency: boolean | null;
   vehicle: string;
   date: string;
@@ -64,6 +71,10 @@ interface OccurrenceReport {
   originText: string;
   agent: string;
   re: string;
+  // UID Firebase do agente que criou/editou o R.O. — campo autenticado verificável pelo servidor.
+  // Ausente em R.O.s históricos criados antes da migração para contas individuais.
+  authorUid?: string;
+  lastAuditId?: string;
   reporterName: string;
   rgCpf: string;
   phone: string;
@@ -270,6 +281,53 @@ const toTitleCase = (s: string) =>
   s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
 interface Agent { name: string; display: string; re: string; role: string; }
+
+// ─────────────────────────────────────────────
+// PERFIL DE AGENTE — modelo de identidade individual
+// ─────────────────────────────────────────────
+
+/**
+ * Perfil armazenado em Firestore: /agentProfiles/{uid}
+ * Criado pelo admin; jamais pelo próprio agente.
+ * Vincula o UID Firebase (identidade autenticada) ao perfil operacional.
+ */
+export interface AgentProfile {
+  uid: string;
+  re: string;
+  name: string;
+  display: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Perfil ausente e falha de rede permanecem estados não verificados. */
+async function loadAgentIdentity(user: User): Promise<AgentIdentityState> {
+  if (user.email?.toLowerCase() === TEAM_EMAIL) {
+    return { status: 'legacy', email: user.email };
+  }
+  try {
+    const snap = await getDoc(doc(db, 'agentProfiles', user.uid));
+    if (!snap.exists()) return { status: 'unverified', reason: 'missing-profile' };
+    const raw = snap.data();
+    if (typeof raw.re !== 'string' || !raw.re || typeof raw.name !== 'string' || !raw.name) {
+      return { status: 'unverified', reason: 'missing-profile' };
+    }
+    return {
+      status: 'individual',
+      profile: {
+        uid: user.uid,
+        re: raw.re,
+        name: raw.name,
+        display: typeof raw.display === 'string' ? raw.display : raw.name,
+        role: typeof raw.role === 'string' ? raw.role : 'Agente',
+      },
+    };
+  } catch {
+    return { status: 'unverified', reason: 'profile-unavailable' };
+  }
+}
+
 const AGENTS: Agent[] = [
   { name: 'AMERICO FERREIRA SOARES',               display: 'Américo Ferreira Soares',               re: '13606', role: 'Agente de Defesa Civil' },
   { name: 'ANDREA DE OLIVEIRA SOUZA',              display: 'Andrea de Oliveira Souza',              re: '20264', role: 'Agente de Defesa Civil' },
@@ -337,42 +395,6 @@ function genId() {
   return Math.random().toString(36).slice(2, 11);
 }
 
-async function nextRONumber(): Promise<string> {
-  const fullYear = new Date().getFullYear().toString();
-
-  // Tenta transação online (garante número único entre os 27 aparelhos)
-  if (navigator.onLine) {
-    try {
-      const counterRef = doc(db, 'meta', 'counter');
-      return await runTransaction(db, async t => {
-        const snap = await t.get(counterRef);
-        const storedYear = snap.data()?.year as string | undefined;
-        const isSameYear = storedYear === fullYear || storedYear === fullYear.slice(-2);
-        const n = isSameYear ? ((snap.data()?.count as number) ?? 0) + 1 : 1;
-        t.set(counterRef, { year: fullYear, count: n });
-        // Salva localmente para fallback offline
-        try { localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n })); } catch { /* noop */ }
-        return `${String(n).padStart(3, '0')}/${fullYear}`;
-      });
-    } catch {
-      // Transação falhou mesmo online — usa fallback local
-    }
-  }
-
-  // Fallback offline: gera número local provisório com sufixo "P" (Provisório)
-  // Ao voltar online o agente pode editar e salvar, atualizando o número definitivo
-  try {
-    const stored = localStorage.getItem('dc_counter');
-    const local = stored ? JSON.parse(stored) as { year: string; count: number } : null;
-    const isSameYear = local?.year === fullYear;
-    const n = isSameYear ? (local!.count + 1) : 1;
-    localStorage.setItem('dc_counter', JSON.stringify({ year: fullYear, count: n }));
-    return `${String(n).padStart(3, '0')}P/${fullYear}`;
-  } catch {
-    return `OFFLINE/${fullYear}`;
-  }
-}
-
 function formatBRLInput(value: string): string {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';
@@ -426,11 +448,12 @@ function getDefaultInterdicao(roNumber = ''): OccurrenceReport['interdicao'] {
 function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
   const roNumber = raw.roNumber || '';
   const defInterdicao = getDefaultInterdicao(roNumber);
-  const rawInterdicao = raw.interdicao || {};
+  const rawInterdicao = (raw.interdicao || {}) as Partial<OccurrenceReport['interdicao']>;
 
   return {
     id: raw.id || genId(),
     roNumber,
+    needsNumber: raw.needsNumber ?? false,
     emergency: raw.emergency ?? null,
     vehicle: raw.vehicle || '',
     date: raw.date || todayISO(),
@@ -440,6 +463,7 @@ function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
     originText: raw.originText || '',
     agent: raw.agent || '',
     re: raw.re || '',
+    authorUid: raw.authorUid,   // undefined em R.O.s históricos — campo opcional para compatibilidade
     reporterName: raw.reporterName || '',
     rgCpf: raw.rgCpf || '',
     phone: raw.phone || '',
@@ -473,7 +497,7 @@ function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
     status: raw.status || 'draft',
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt: raw.updatedAt || new Date().toISOString(),
-    editHistory: raw.editHistory ?? [{ at: new Date().toISOString(), by: 'Sistema', action: 'Criado' }],
+    editHistory: raw.editHistory ?? [],
     interdicao: {
       ...defInterdicao,
       ...rawInterdicao,
@@ -508,6 +532,14 @@ function normalizeRO(raw: Partial<OccurrenceReport> = {}): OccurrenceReport {
 
 function createNewRO(roNumber: string): OccurrenceReport {
   return normalizeRO({ roNumber });
+}
+
+function reportUpdateFields(report: OccurrenceReport): Record<string, unknown> {
+  const mutable = { ...report } as Record<string, unknown>;
+  for (const key of ['id', 'createdAt', 'authorUid', 'agent', 're', 'editHistory', 'roNumber', 'needsNumber']) {
+    delete mutable[key];
+  }
+  return mutable;
 }
 
 async function compressImage(file: File): Promise<string> {
@@ -2090,7 +2122,6 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
               <ReviewSection title="Endereço">
                 <ReviewRow label="Logradouro" value={[ro.address, ro.addressNumber].filter(Boolean).join(', ')} />
                 <ReviewRow label="Bairro" value={ro.neighborhood} />
-                {ro.complement && <ReviewRow label="Complemento" value={ro.complement} />}
               </ReviewSection>
 
               {/* Ocorrência */}
@@ -2100,10 +2131,10 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
               </ReviewSection>
 
               {/* Solicitante */}
-              {(ro.reporterName || ro.reporterPhone) && (
+              {(ro.reporterName || ro.phone) && (
                 <ReviewSection title="Solicitante">
                   <ReviewRow label="Nome" value={ro.reporterName} />
-                  <ReviewRow label="Telefone" value={ro.reporterPhone} />
+                  <ReviewRow label="Telefone" value={ro.phone} />
                 </ReviewSection>
               )}
 
@@ -2202,15 +2233,20 @@ function WizardScreen({ ro, onUpdate, onSave, onCancel }: {
 // HOME
 // ─────────────────────────────────────────────
 
-function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onToggleDark, onSignOut }: {
+function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onToggleDark, onSignOut,
+  recoveryRecords, onRetryRecovery, syncMessage, bulkDeleteMessage }: {
   ros: OccurrenceReport[];
   onNew: () => void;
   onView: (r: OccurrenceReport) => void;
   onDelete: (id: string) => void;
-  onDeleteAll: () => void;
+  onDeleteAll: () => Promise<void>;
   darkMode: boolean;
   onToggleDark: () => void;
   onSignOut: () => void;
+  recoveryRecords: RecoveryRecord[];
+  onRetryRecovery: (id: string) => void;
+  syncMessage: string | null;
+  bulkDeleteMessage: string | null;
 }) {
   const [query, setQuery]           = useState('');
   const [confirmId, setConfirmId]   = useState<string | null>(null);
@@ -2219,6 +2255,7 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom]     = useState('');
   const [dateTo, setDateTo]         = useState('');
+  const [bulkBusy, setBulkBusy]     = useState(false);
 
   const q = query.trim().toLowerCase();
   const filtered = [...ros].reverse().filter(ro => {
@@ -2501,6 +2538,29 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
 
       {/* Lista */}
       <div className="flex-1 p-4 pb-28">
+        {(syncMessage || bulkDeleteMessage) && (
+          <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+            {syncMessage || bulkDeleteMessage}
+          </div>
+        )}
+        {recoveryRecords.length > 0 && (
+          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+            <h2 className="text-sm font-black text-red-800">R.O.s aguardando correção e reenvio ({recoveryRecords.length})</h2>
+            <p className="mt-1 text-xs text-red-700">Cópias guardadas neste aparelho; o servidor não confirmou esses registros.</p>
+            <div className="mt-3 space-y-2">
+              {recoveryRecords.map(item => (
+                <div key={item.roId} className="rounded-xl bg-white p-3">
+                  <p className="text-xs font-bold text-gray-800">R.O. {String(item.steps.at(-1)?.report.roNumber || 'sem número')}</p>
+                  <p className="mt-1 break-words text-[11px] text-gray-600">{item.reason}</p>
+                  <button type="button" onClick={() => onRetryRecovery(item.roId)}
+                    className="mt-2 rounded-lg bg-[#1B3A6B] px-3 py-2 text-xs font-bold text-white">
+                    Tentar sincronizar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         {ros.length === 0 ? (
           <div className="text-center py-20">
             <FileText size={52} className={cn('mx-auto mb-4', mutedTxt)} />
@@ -2537,7 +2597,9 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-                        <span className={cn('font-bold text-sm', numClr)}>R.O. {ro.roNumber}</span>
+                        <span className={cn('font-bold text-sm', numClr)}>
+                          {ro.needsNumber ? '⏳ Aguardando nº' : `R.O. ${ro.roNumber}`}
+                        </span>
                         <div className="flex gap-1.5">
                           {ro.conclusionStatus && (
                             <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-semibold', conclusionColors[ro.conclusionStatus] ?? '')}>
@@ -2611,9 +2673,10 @@ function HomeScreen({ ros, onNew, onView, onDelete, onDeleteAll, darkMode, onTog
                 className={cn('flex-1 py-3 rounded-xl border-2 font-semibold text-sm', dk ? 'border-slate-600 text-slate-300' : 'border-gray-200 text-gray-600')}>
                 Cancelar
               </button>
-              <button type="button" onClick={() => { onDeleteAll(); setConfirmAll(false); }}
-                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm">
-                Excluir Todos
+              <button type="button" disabled={bulkBusy}
+                onClick={async () => { setBulkBusy(true); try { await onDeleteAll(); setConfirmAll(false); } catch { /* mensagem detalhada exibida na tela */ } finally { setBulkBusy(false); } }}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm disabled:opacity-50">
+                {bulkBusy ? 'Excluindo…' : 'Excluir Todos'}
               </button>
             </div>
           </div>
@@ -2694,7 +2757,10 @@ function ShareModal({ ro, onClose }: { ro: OccurrenceReport; onClose: () => void
   );
 }
 
-function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; onBack: () => void; onPrint: () => void; onEdit: () => void }) {
+function ViewROScreen({ ro, onBack, onPrint, onEdit, auditEvents, syncState }: {
+  ro: OccurrenceReport; onBack: () => void; onPrint: () => void; onEdit: () => void;
+  auditEvents: AuditEntry[]; syncState?: 'pending' | 'confirmed' | 'rejected';
+}) {
   const [showShare, setShowShare] = useState(false);
   const type = OCCURRENCE_TYPES.find(t => t.id === ro.occurrenceTypeId);
 
@@ -2734,6 +2800,15 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
       </div>
 
       <div className="p-4 pb-10">
+        {syncState && (
+          <div className={cn('mb-3 rounded-xl p-3 text-xs font-bold',
+            syncState === 'confirmed' ? 'bg-green-100 text-green-800' :
+              syncState === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900')}>
+            {syncState === 'confirmed' ? '✓ R.O. confirmado pelo servidor.' :
+              syncState === 'rejected' ? '⚠ R.O. rejeitado pelo servidor. Acesse a tela inicial para recuperar e reenviar.' :
+                '⏳ Sincronização pendente; aguardando confirmação do servidor.'}
+          </div>
+        )}
         {ro.emergency && (
           <div className="bg-red-500 text-white rounded-2xl p-3 mb-3 flex items-center gap-2">
             <AlertTriangle size={18} />
@@ -2831,10 +2906,21 @@ function ViewROScreen({ ro, onBack, onPrint, onEdit }: { ro: OccurrenceReport; o
           <Row label="Preenchido por" value={[ro.filledBy, ro.role].filter(Boolean).join(' — ')} />
         </Sec>
 
-        {(ro.editHistory ?? []).length > 0 && (
+        {(auditEvents.length > 0 || (ro.editHistory ?? []).length > 0) && (
           <Sec title="Histórico de alterações">
             <div className="space-y-2">
-              {[...(ro.editHistory ?? [])].reverse().map((h, i) => (
+              {(auditEvents.length > 0
+                ? [...auditEvents].reverse().map(event => ({
+                    at: event.at,
+                    by: event.agentName,
+                    action: ({
+                      ro_draft_created: 'Rascunho criado', ro_saved: 'R.O. salvo',
+                      ro_edited: 'R.O. editado', ro_number_assigned: 'Número definitivo atribuído',
+                      ro_deleted: 'R.O. excluído',
+                    } as Record<string, string>)[event.action] ?? event.action,
+                  }))
+                : [...(ro.editHistory ?? [])].reverse()
+              ).map((h, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <History size={12} className="text-[#1B3A6B]" />
@@ -2892,8 +2978,8 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
     <td colSpan={colSpan} className={cn('border border-gray-500 px-1.5 py-1 align-top text-[10px]', className)}>{children}</td>
   );
 
-  const TLabel = ({ children }: { children: React.ReactNode }) => (
-    <span className="font-bold text-[9px] uppercase block leading-tight text-gray-600">{children}</span>
+  const TLabel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <span className={`font-bold text-[9px] uppercase block leading-tight text-gray-600${className ? ' ' + className : ''}`}>{children}</span>
   );
 
   const TValue = ({ children, className: cls }: { children: React.ReactNode; className?: string }) => (
@@ -3597,12 +3683,18 @@ function PrintScreen({ ro, onClose }: { ro: OccurrenceReport; onClose: () => voi
 // LOGIN SCREEN
 // ─────────────────────────────────────────────
 
+// Email da conta compartilhada legada — mantido para compatibilidade durante a migração.
+// Após a migração para contas individuais, este valor não será mais usado no login.
 const TEAM_EMAIL = 'defesacivil0199@gmail.com';
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  // Modo legado: o agente deixa o email em branco e usa a conta compartilhada
+  const effectiveEmail = email.trim() || TEAM_EMAIL;
+  const isLegacyMode = !email.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3610,10 +3702,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, TEAM_EMAIL, password);
+      await signInWithEmailAndPassword(auth, effectiveEmail, password);
       onLogin();
     } catch {
-      setError('Senha incorreta. Verifique e tente novamente.');
+      setError(
+        isLegacyMode
+          ? 'Senha incorreta. Verifique e tente novamente.'
+          : 'Email ou senha incorretos. Verifique e tente novamente.',
+      );
     } finally {
       setLoading(false);
     }
@@ -3634,10 +3730,20 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-1">Conta da equipe</p>
-              <div className="px-4 py-3 bg-gray-100 rounded-xl text-sm text-gray-600 font-medium">
-                {TEAM_EMAIL}
-              </div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Email (opcional)</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError(''); }}
+                placeholder={`Deixe em branco para usar ${TEAM_EMAIL}`}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]"
+                autoComplete="email"
+              />
+              {isLegacyMode && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  Modo compartilhado — use seu email individual se disponível
+                </p>
+              )}
             </div>
 
             <div>
@@ -3646,7 +3752,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Digite a senha da equipe"
+                placeholder={isLegacyMode ? 'Senha da equipe' : 'Sua senha individual'}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]"
                 autoComplete="current-password"
               />
@@ -3679,9 +3785,23 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 // PIN SCREEN — identificação do agente pelo RE
 // ─────────────────────────────────────────────
 
-function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void; onCancel: () => void }) {
+function PinScreen({
+  onConfirm,
+  onCancel,
+  identity,
+}: {
+  onConfirm: (agent: Agent) => void;
+  onCancel: () => void;
+  identity: AgentIdentityState | 'checking';
+}) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (identity === 'checking' || identity.status !== 'individual') return;
+    const found = AGENTS.find(a => a.re === identity.profile.re);
+    if (found) onConfirm(found);
+  }, [identity, onConfirm]);
 
   const handleConfirm = () => {
     const found = AGENTS.find(a => a.re === pin.trim());
@@ -3693,6 +3813,44 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
     onConfirm(found);
   };
 
+  // Com perfil individual: mostra tela de confirmação de identidade (sem campo de PIN)
+  if (identity === 'checking') {
+    return <div className="min-h-screen bg-[#1B3A6B] grid place-items-center text-white">Verificando identidade…</div>;
+  }
+
+  if (identity.status === 'individual') {
+    return (
+      <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
+        <div style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} className="w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 border border-white/10">
+          <div className="text-center">
+            <div className="text-3xl mb-1">✅</div>
+            <h2 className="text-lg font-black text-[#1B3A6B] dark:text-blue-400">Identidade Confirmada</h2>
+            <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">{identity.profile.display}</p>
+            <p style={{ color: 'var(--text-muted)' }} className="text-xs mt-0.5">RE {identity.profile.re} · {identity.profile.role}</p>
+          </div>
+          <p className="text-xs text-center text-green-600">Iniciando R.O....</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (identity.status === 'unverified') {
+    return (
+      <div className="min-h-screen bg-[#1B3A6B] flex items-center justify-center px-6">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center space-y-4">
+          <h2 className="font-bold text-red-700">Identidade não verificada</h2>
+          <p className="text-sm text-gray-600">
+            {identity.reason === 'profile-unavailable'
+              ? 'Não foi possível consultar seu perfil. Conecte-se à internet e tente novamente.'
+              : 'Esta conta ainda não tem um perfil de agente autorizado.'}
+          </p>
+          <button type="button" onClick={onCancel} className="w-full rounded-xl bg-[#1B3A6B] py-3 font-bold text-white">Voltar</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Sem perfil individual: modo legado — digita RE manualmente
   return (
     <div className="min-h-screen bg-[#1B3A6B] flex flex-col items-center justify-center px-6">
       <div style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} className="w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 border border-white/10">
@@ -3700,6 +3858,7 @@ function PinScreen({ onConfirm, onCancel }: { onConfirm: (agent: Agent) => void;
           <div className="text-3xl mb-1">🔶</div>
           <h2 className="text-lg font-black text-[#1B3A6B] dark:text-blue-400">Identificação</h2>
           <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">Digite seu número de RE para preencher o R.O.</p>
+          <p className="text-xs text-amber-600 mt-1">Conta legada compartilhada. O R.O. ficará identificado como criado por esta conta, e o nome selecionado é operacional.</p>
         </div>
 
         <div className="space-y-2">
@@ -3744,11 +3903,38 @@ export default function App() {
   const [user, setUser] = useState<User | null | 'checking'>('checking');
   const [currentRO, setCurrentRO] = useState<OccurrenceReport | null>(null);
   const editMode = useRef(false);
+  const editSnapshot = useRef<OccurrenceReport | null>(null);
+  const [syncStates, setSyncStates] = useState<Record<string, 'pending' | 'confirmed' | 'rejected'>>({});
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<AgentIdentityState | 'checking'>('checking');
+  const [recoveryRecords, setRecoveryRecords] = useState<RecoveryRecord[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEntry[]>([]);
+  const [bulkDeleteMessage, setBulkDeleteMessage] = useState<string | null>(null);
+  const remoteRecordState = useRef(new Map<string, 'pending-create' | 'exists' | 'missing'>());
+  const numberingInFlight = useRef(new Set<string>());
 
-  // ── Autenticação ──
+  // ── Autenticação — carrega perfil individual ao logar ──
   useEffect(() => {
-    return onAuthStateChanged(auth, u => setUser(u));
+    let generation = 0;
+    return onAuthStateChanged(auth, async u => {
+      const current = ++generation;
+      setUser(u);
+      if (u) {
+        setIdentity('checking');
+        const resolved = await loadAgentIdentity(u);
+        if (current === generation) setIdentity(resolved);
+      } else {
+        setIdentity({ status: 'unverified', reason: 'missing-profile' });
+      }
+    });
   }, []);
+
+  useEffect(() => {
+    if (!user || user === 'checking') return;
+    void listRecoveryRecords().then(setRecoveryRecords).catch(() => {
+      setSyncMessage('Não foi possível abrir a área local de recuperação. Os R.O.s atuais continuam na tela.');
+    });
+  }, [user]);
 
   // ── Sincronização em tempo real via Firestore (só se autenticado) ──
   // Solicita permissão de notificação ao logar
@@ -3762,13 +3948,66 @@ export default function App() {
   const rosIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
 
+  const reconcilePendingNumber = useCallback(async (ro: OccurrenceReport) => {
+    if (!ro.needsNumber || !navigator.onLine || !user || user === 'checking' || identity === 'checking' || identity.status === 'unverified') return;
+    if (numberingInFlight.current.has(ro.id)) return;
+    numberingInFlight.current.add(ro.id);
+    const actorName = identity.status === 'individual'
+      ? (identity.profile.display ?? identity.profile.name ?? 'Agente')
+      : 'Conta legada';
+    try {
+      for (let attempt = 0; attempt < 7 && navigator.onLine; attempt++) {
+        const assignment = await assignRONumber(db, ro.id, new Date().getFullYear().toString(), {
+          uid: user.uid,
+          agentName: actorName,
+        });
+        if (assignment) {
+          remoteRecordState.current.set(ro.id, 'exists');
+          const patchRO = (current: OccurrenceReport): OccurrenceReport => {
+            const updated = {
+              ...current,
+              roNumber: assignment.roNumber,
+              needsNumber: false,
+              lastAuditId: assignment.auditId || current.lastAuditId,
+            };
+            if (current.interdicao && (!current.interdicao.numero || current.interdicao.numero === current.roNumber)) {
+              updated.interdicao = { ...current.interdicao, numero: assignment.roNumber };
+            }
+            return updated;
+          };
+          setRos(current => current.map(item => item.id === ro.id ? patchRO(item) : item));
+          setCurrentRO(current => current?.id === ro.id ? patchRO(current) : current);
+          setSyncStates(current => ({ ...current, [ro.id]: 'confirmed' }));
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 15000)));
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSyncStates(current => ({ ...current, [ro.id]: 'rejected' }));
+      setSyncMessage(`A numeração do R.O. ${ro.roNumber || ro.id} foi rejeitada pelo servidor. Os dados permanecem salvos como pendentes; corrija o motivo e tente novamente. ${reason}`);
+    } finally {
+      numberingInFlight.current.delete(ro.id);
+    }
+  }, [identity, user]);
+
   useEffect(() => {
     if (!user || user === 'checking') return;
     const q = query(collection(db, 'ros'), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, snap => {
-      const list = snap.docs.map(d => normalizeRO(d.data() as Partial<OccurrenceReport>));
+    const unsub = onSnapshot(q, { includeMetadataChanges: true }, snap => {
+      const list = snap.docs.map(d => normalizeRO({ ...(d.data() as Partial<OccurrenceReport>), id: d.id }));
       setRos(list);
+      if (!snap.metadata.fromCache) {
+        setSyncStates(current => {
+          const next = { ...current };
+          for (const item of snap.docs) {
+            next[item.id] = item.metadata.hasPendingWrites ? 'pending' : 'confirmed';
+          }
+          return next;
+        });
+      }
       setLoading(false);
+      list.filter(ro => ro.needsNumber).forEach(ro => { void reconcilePendingNumber(ro); });
 
       // Notificação quando outro agente salva um R.O. novo
       if (!firstLoad.current && Notification.permission === 'granted') {
@@ -3789,17 +4028,38 @@ export default function App() {
       rosIds.current = new Set(list.map(r => r.id));
     }, () => setLoading(false));
     return unsub;
-  }, [user]);
+  }, [user, reconcilePendingNumber]);
+
+  useEffect(() => {
+    if (!currentRO || !user || user === 'checking') {
+      setAuditEvents([]);
+      return;
+    }
+    const auditQuery = query(
+      collection(db, 'auditLog'),
+      where('roId', '==', currentRO.id),
+      orderBy('at', 'asc'),
+    );
+    return onSnapshot(auditQuery, snapshot => {
+      setAuditEvents(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AuditEntry)));
+    }, () => setAuditEvents([]));
+  }, [currentRO?.id, user]);
 
   // ── Offline ──
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   useEffect(() => {
-    const on  = () => setIsOnline(true);
+    const on  = () => {
+      setIsOnline(true);
+      setRos(prev => {
+        prev.filter(r => r.needsNumber).forEach(r => { void reconcilePendingNumber(r); });
+        return prev; // sem mudança imediata; as atualizações chegam pelas promises acima
+      });
+    };
     const off = () => setIsOnline(false);
     window.addEventListener('online',  on);
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
-  }, []);
+  }, [reconcilePendingNumber]);
 
   // ── Tema escuro ──
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -3815,12 +4075,80 @@ export default function App() {
     setScreen('pin');
   };
 
-  const handlePinConfirm = async (agentData: Agent) => {
-    const roNumber = await nextRONumber();
-    const ro = createNewRO(roNumber);
-    setCurrentRO({ ...ro, agent: agentData.name, re: agentData.re, role: agentData.role, agentLocked: true });
+  const handlePinConfirm = useCallback(async (agentData: Agent) => {
+    const authorization = identity === 'checking'
+      ? { authorized: false, reason: 'A identidade ainda está sendo verificada.' }
+      : checkAgentAuthorizationPure(identity, agentData.re);
+    const currentUid = user && user !== 'checking' ? user.uid : undefined;
+    if (!authorization.authorized || !currentUid) {
+      setSyncMessage(authorization.reason ?? 'Não foi possível verificar o usuário autenticado.');
+      return;
+    }
+
+    const ro = createNewRO('');
+    const legacy = identity !== 'checking' && identity.status === 'legacy';
+    const initialRO: OccurrenceReport = {
+      ...ro,
+      roNumber: '',
+      needsNumber: true,
+      agent: agentData.name,
+      re: agentData.re,
+      role: agentData.role,
+      agentLocked: true,
+      authorUid: currentUid,
+      editHistory: [],
+    };
+    const audit = createAuditEntry({
+      at: new Date().toISOString(),
+      uid: currentUid,
+      agentName: legacy ? `Conta legada — ${agentData.name}` : agentData.display,
+      action: 'ro_draft_created',
+      roId: initialRO.id,
+    });
+    initialRO.lastAuditId = audit.id;
+
+    remoteRecordState.current.set(initialRO.id, 'pending-create');
+    setSyncStates(current => ({ ...current, [initialRO.id]: 'pending' }));
+    setCurrentRO(initialRO);
     setScreen('wizard');
-  };
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'ros', initialRO.id), initialRO);
+    addAuditToBatch(batch, audit);
+    void batch.commit().then(async () => {
+      remoteRecordState.current.set(initialRO.id, 'exists');
+      setSyncStates(current => ({ ...current, [initialRO.id]: 'confirmed' }));
+      await acknowledgeRecoveryStep(initialRO.id, audit.id).catch(() => undefined);
+      setRecoveryRecords(await listRecoveryRecords().catch(() => []));
+      void reconcilePendingNumber(initialRO);
+    }).catch(async error => {
+      if (navigator.onLine) {
+        const serverSnapshot = await getDocFromServer(doc(db, 'ros', initialRO.id)).catch(() => null);
+        const serverData = serverSnapshot?.data();
+        if (serverData?.lastAuditId !== audit.id &&
+          typeof serverData?.updatedAt === 'string' && serverData.updatedAt > initialRO.updatedAt) {
+          remoteRecordState.current.set(initialRO.id, 'exists');
+          setSyncStates(current => ({ ...current, [initialRO.id]: 'confirmed' }));
+          return; // Uma gravação posterior confirmou o snapshot completo do R.O.
+        }
+      }
+      remoteRecordState.current.set(initialRO.id, 'missing');
+      setSyncStates(current => ({ ...current, [initialRO.id]: 'rejected' }));
+      const reason = error instanceof Error ? error.message : String(error);
+      try {
+        await saveRecoveryRecord({
+          roId: initialRO.id,
+          steps: [{ operation: 'create', report: initialRO as unknown as Record<string, unknown>, audit }],
+          reason,
+          updatedAt: new Date().toISOString(),
+        });
+        setRecoveryRecords(await listRecoveryRecords());
+        setSyncMessage('O servidor rejeitou a criação do rascunho. Uma cópia recuperável foi guardada neste aparelho; reenvie pela tela inicial após corrigir o acesso.');
+      } catch {
+        setSyncMessage('O servidor rejeitou a criação e o aparelho não conseguiu guardar uma cópia de recuperação. Mantenha esta tela aberta e copie os dados antes de sair.');
+      }
+    });
+  }, [identity, user, reconcilePendingNumber]);
 
   const handleUpdate = useCallback((updates: Partial<OccurrenceReport>) => {
     setCurrentRO(prev => {
@@ -3843,53 +4171,257 @@ export default function App() {
   const handleSave = useCallback(async () => {
     if (!currentRO) return;
     const now = new Date().toISOString();
-    const agentName = currentRO.agent
-      ? (AGENTS.find(a => a.name === currentRO.agent)?.display ?? currentRO.agent)
-      : 'Agente';
+    const agentName = identity !== 'checking' && identity.status === 'individual'
+      ? (identity.profile.display ?? identity.profile.name ?? 'Agente')
+      : `Conta legada — ${AGENTS.find(a => a.name === currentRO.agent)?.display ?? currentRO.agent ?? 'Agente'}`;
     const isEdit = editMode.current;
-    const historyEntry = { at: now, by: agentName, action: isEdit ? 'Editado' : 'Salvo' };
-    const saved = {
+    const currentUid = (user && user !== 'checking') ? user.uid : undefined;
+    if (!currentUid) {
+      setSyncMessage('Sessão não autenticada. O R.O. continua aberto e não foi enviado.');
+      return;
+    }
+    const audit = createAuditEntry({
+      at: now,
+      uid: currentUid,
+      agentName,
+      action: isEdit ? 'ro_edited' : 'ro_saved',
+      roId: currentRO.id,
+      roNumber: currentRO.roNumber || undefined,
+    });
+    const saved: OccurrenceReport = {
       ...currentRO,
       endTime: currentRO.endTime || nowHHMM(),
       status: 'completed' as const,
       updatedAt: now,
-      editHistory: [...(currentRO.editHistory ?? []), historyEntry],
+      lastAuditId: audit.id,
     };
-    // setDoc com cache persistente grava no IndexedDB imediatamente (offline-safe)
-    // Não aguardamos — evita travar em áreas sem sinal
-    setDoc(doc(db, 'ros', saved.id), saved).catch(() => { /* sincroniza ao voltar online */ });
+    const operation = remoteRecordState.current.get(saved.id) === 'exists' ? 'update' : 'create';
+    const batch = writeBatch(db);
+    const roRef = doc(db, 'ros', saved.id);
+    if (operation === 'create') {
+      batch.set(roRef, saved);
+    } else {
+      const mutable = { ...saved } as Partial<OccurrenceReport> & Record<string, unknown>;
+      delete mutable.id;
+      delete mutable.createdAt;
+      delete mutable.authorUid;
+      delete mutable.agent;
+      delete mutable.re;
+      delete mutable.editHistory;
+      // A numeração é alterada exclusivamente pela transação de reconciliação.
+      delete mutable.roNumber;
+      delete mutable.needsNumber;
+      batch.update(roRef, mutable);
+    }
+    addAuditToBatch(batch, audit);
+    setSyncMessage(null);
+    setSyncStates(current => ({ ...current, [saved.id]: 'pending' }));
+    void batch.commit().then(async () => {
+      remoteRecordState.current.set(saved.id, 'exists');
+      setSyncStates(current => ({ ...current, [saved.id]: 'confirmed' }));
+      await acknowledgeRecoveryThrough(saved.id, audit.id, audit.at).catch(() => undefined);
+      setRecoveryRecords(await listRecoveryRecords().catch(() => []));
+      if (saved.needsNumber) void reconcilePendingNumber(saved);
+    }).catch(async error => {
+      setSyncStates(current => ({ ...current, [saved.id]: 'rejected' }));
+      const code = (error as { code?: string })?.code ?? '';
+      const reason = error instanceof Error ? error.message : String(error);
+      const permanent = ['permission-denied', 'invalid-argument', 'failed-precondition', 'not-found'].includes(code);
+      try {
+        await saveRecoveryRecord({
+          roId: saved.id,
+          steps: [{ operation, report: saved as unknown as Record<string, unknown>, audit }],
+          reason,
+          updatedAt: new Date().toISOString(),
+        });
+        setRecoveryRecords(await listRecoveryRecords());
+        setSyncMessage(permanent
+          ? 'O servidor rejeitou este R.O. por uma regra ou dado inválido. A cópia foi guardada neste aparelho; corrija a causa e use “Tentar sincronizar”.'
+          : 'A sincronização falhou. O R.O. e a tentativa de auditoria foram guardados na recuperação local para nova tentativa.');
+      } catch {
+        setSyncMessage('O servidor rejeitou este R.O. e o aparelho não conseguiu guardar a cópia de recuperação. Mantenha esta tela aberta e exporte os dados antes de sair.');
+      }
+    });
+    editSnapshot.current = null;
+    editMode.current = false;
     setCurrentRO(saved);
     setScreen('view');
-  }, [currentRO]);
+  }, [currentRO, user, identity, reconcilePendingNumber]);
 
   const handleCancel = useCallback(async () => {
     if (editMode.current && currentRO) {
+      // Reverte para o snapshot salvo antes da edição, evitando mostrar dados não persistidos
+      const snapshot = editSnapshot.current;
+      editMode.current = false;
+      editSnapshot.current = null;
+      setCurrentRO(snapshot ?? currentRO);
       setScreen('view');
       return;
     }
-    if (currentRO) {
-      const draft = { ...currentRO, status: 'draft' as const };
-      setDoc(doc(db, 'ros', draft.id), draft).catch(() => { /* sincroniza ao voltar online */ });
+    // “Salvar rascunho” persiste os dados do formulário em vez de descartar o que foi digitado.
+    if (currentRO && user && user !== 'checking') {
+      const operation = remoteRecordState.current.get(currentRO.id) === 'exists' ? 'update' : 'create';
+      const audit = createAuditEntry({
+        at: new Date().toISOString(),
+        uid: user.uid,
+        agentName: identity !== 'checking' && identity.status === 'individual'
+          ? identity.profile.display ?? identity.profile.name ?? 'Agente'
+          : `Conta legada — ${AGENTS.find(a => a.name === currentRO.agent)?.display ?? currentRO.agent}`,
+        action: operation === 'create' ? 'ro_draft_created' : 'ro_draft_updated',
+        roId: currentRO.id,
+        roNumber: currentRO.roNumber || undefined,
+      });
+      const draft: OccurrenceReport = {
+        ...currentRO,
+        status: 'draft',
+        updatedAt: new Date().toISOString(),
+        lastAuditId: audit.id,
+      };
+      const batch = writeBatch(db);
+      const ref = doc(db, 'ros', draft.id);
+      if (operation === 'create') batch.set(ref, draft);
+      else batch.update(ref, reportUpdateFields(draft));
+      addAuditToBatch(batch, audit);
+      setSyncStates(state => ({ ...state, [draft.id]: 'pending' }));
+      void batch.commit().then(async () => {
+        remoteRecordState.current.set(draft.id, 'exists');
+        setSyncStates(state => ({ ...state, [draft.id]: 'confirmed' }));
+        await acknowledgeRecoveryThrough(draft.id, audit.id, audit.at).catch(() => undefined);
+        setRecoveryRecords(await listRecoveryRecords().catch(() => []));
+        if (draft.needsNumber) void reconcilePendingNumber(draft);
+      }).catch(async error => {
+        setSyncStates(state => ({ ...state, [draft.id]: 'rejected' }));
+        try {
+          await saveRecoveryRecord({
+            roId: draft.id,
+            steps: [{ operation, report: draft as unknown as Record<string, unknown>, audit }],
+            reason: error instanceof Error ? error.message : String(error),
+            updatedAt: new Date().toISOString(),
+          });
+          setRecoveryRecords(await listRecoveryRecords());
+          setSyncMessage('O rascunho não foi confirmado pelo servidor; a cópia local está disponível para reenvio na tela inicial.');
+        } catch {
+          setSyncMessage('Falha ao salvar o rascunho e ao criar a cópia local de recuperação. Mantenha a aplicação aberta para preservar os dados.');
+        }
+      });
+      setRos(previous => previous.some(item => item.id === draft.id)
+        ? previous.map(item => item.id === draft.id ? draft : item)
+        : [...previous, draft]);
     }
     setScreen('home');
     setCurrentRO(null);
-  }, [currentRO]);
+  }, [currentRO, user, identity, reconcilePendingNumber]);
 
   const handleView = (ro: OccurrenceReport) => { setCurrentRO(normalizeRO(ro)); setScreen('view'); };
   const handleBack = () => { setScreen('home'); setCurrentRO(null); };
   const handleEdit = () => {
-    setCurrentRO(prev => prev ? normalizeRO(prev) : null);
+    setCurrentRO(prev => {
+      if (!prev) return null;
+      const normalized = normalizeRO(prev);
+      // Guarda snapshot para reverter se o agente cancelar a edição
+      editSnapshot.current = normalized;
+      return normalized;
+    });
     editMode.current = true;
     setScreen('wizard');
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, 'ros', id));
+    const currentUid = (user && user !== 'checking') ? user.uid : undefined;
+    const ro = ros.find(r => r.id === id);
+    if (!currentUid || !ro) return;
+    try {
+      const batch = writeBatch(db);
+      const audit = createAuditEntry({
+        at: new Date().toISOString(),
+        uid: currentUid,
+        agentName: identity !== 'checking' && identity.status === 'individual'
+          ? identity.profile.display ?? identity.profile.name ?? 'Administrador'
+          : 'Administrador',
+        action: 'ro_deleted',
+        roId: id,
+        roNumber: ro.roNumber || undefined,
+      });
+      batch.delete(doc(db, 'ros', id));
+      addAuditToBatch(batch, audit);
+      await batch.commit();
+      setSyncMessage(null);
+    } catch (error) {
+      setSyncMessage(`Não foi possível excluir o R.O. ${ro.roNumber}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
   const handleDeleteAll = async () => {
-    const batch = writeBatch(db);
-    ros.forEach(r => batch.delete(doc(db, 'ros', r.id)));
-    await batch.commit();
+    if (!user || user === 'checking') throw new Error('Sessão não autenticada.');
+    const targets = [...ros];
+    setBulkDeleteMessage(null);
+    try {
+      const result = await deleteROsInChunks(db, targets, {
+        uid: user.uid,
+        agentName: identity !== 'checking' && identity.status === 'individual'
+          ? identity.profile.display ?? identity.profile.name ?? 'Administrador'
+          : 'Administrador',
+      });
+      setBulkDeleteMessage(`${result.deleted} R.O.s excluídos com sucesso.`);
+    } catch (error) {
+      const message = error instanceof BulkDeleteError
+        ? `${error.message}. ${error.total - error.deleted} registros permanecem; tente excluir novamente.`
+        : `Falha ao excluir os R.O.s: ${error instanceof Error ? error.message : String(error)}`;
+      setBulkDeleteMessage(message);
+      throw new Error(message);
+    }
+  };
+
+  const retryRecovery = async (roId: string) => {
+    const record = recoveryRecords.find(item => item.roId === roId);
+    if (!record || !navigator.onLine) {
+      setSyncMessage('Conecte-se à internet para tentar novamente.');
+      return;
+    }
+    setSyncStates(current => ({ ...current, [roId]: 'pending' }));
+    try {
+      for (const step of record.steps) {
+        const roRef = doc(db, 'ros', roId);
+        const serverSnapshot = await getDocFromServer(roRef);
+        const serverData = serverSnapshot.data();
+        const serverIsNewer = typeof serverData?.updatedAt === 'string' &&
+          typeof step.report.updatedAt === 'string' && serverData.updatedAt > step.report.updatedAt;
+        if (serverData?.lastAuditId === step.audit.id || serverIsNewer) {
+          await acknowledgeRecoveryStep(roId, step.audit.id);
+          continue;
+        }
+
+        const batch = writeBatch(db);
+        if (step.operation === 'create' && !serverSnapshot.exists()) {
+          batch.set(roRef, step.report);
+        } else if (serverSnapshot.exists()) {
+          batch.update(roRef, reportUpdateFields(normalizeRO(step.report as Partial<OccurrenceReport>)));
+        } else {
+          throw new Error('O documento ainda não existe no servidor; a etapa de criação precisa ser recuperada primeiro.');
+        }
+        addAuditToBatch(batch, step.audit);
+        await batch.commit();
+        await acknowledgeRecoveryStep(roId, step.audit.id);
+      }
+      const remainingRecovery = await listRecoveryRecords();
+      setRecoveryRecords(remainingRecovery);
+      remoteRecordState.current.set(roId, 'exists');
+      if (remainingRecovery.some(item => item.roId === roId)) {
+        setSyncStates(current => ({ ...current, [roId]: 'pending' }));
+        setSyncMessage('Uma etapa foi confirmada, mas ainda há alterações mais recentes aguardando tentativa.');
+        return;
+      }
+      setSyncStates(current => ({ ...current, [roId]: 'confirmed' }));
+      setSyncMessage('R.O. e trilha de auditoria confirmados pelo servidor.');
+      const recovered = record.steps.at(-1)?.report as Partial<OccurrenceReport> | undefined;
+      if (recovered?.needsNumber) void reconcilePendingNumber(normalizeRO(recovered));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const updated = { ...record, reason, updatedAt: new Date().toISOString() };
+      await saveRecoveryRecord(updated).catch(() => undefined);
+      setRecoveryRecords(await listRecoveryRecords().catch(() => recoveryRecords));
+      setSyncStates(current => ({ ...current, [roId]: 'rejected' }));
+      setSyncMessage(`A nova tentativa foi rejeitada. A cópia local continua preservada: ${reason}`);
+    }
   };
 
   // Aguardando Firebase verificar sessão salva
@@ -3916,28 +4448,40 @@ export default function App() {
 
   const offlineBanner = !isOnline && (
     <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-xs font-bold text-center py-2 no-print leading-tight">
-      ⚠️ Sem conexão — R.O.s salvos localmente e sincronizados ao voltar online
+      ⚠️ Sem conexão — gravações ficam pendentes até o servidor confirmá-las
     </div>
   );
 
-  const provisorioBanner = currentRO?.roNumber?.includes('P/') && (
+  const provisorioBanner = currentRO?.needsNumber && (
     <div className="fixed top-0 left-0 right-0 z-[100] bg-orange-500 text-white text-xs font-bold text-center py-2 no-print leading-tight">
-      📋 Nº provisório ({currentRO.roNumber}) — será atualizado ao conectar
+      📋 Sem conexão — número do R.O. será atribuído ao voltar online
+    </div>
+  );
+
+  const currentSyncState = currentRO ? syncStates[currentRO.id] : undefined;
+  const syncMessageBanner = syncMessage && (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-red-700 text-white text-xs font-bold text-center py-2 px-4 no-print leading-tight flex items-center justify-between gap-2">
+      <span>⚠️ {syncMessage}</span>
+      <button type="button" onClick={() => setSyncMessage(null)}
+        className="shrink-0 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white">
+        <X size={12} />
+      </button>
     </div>
   );
 
   if (screen === 'pin')
-    return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} />;
+    return <PinScreen onConfirm={handlePinConfirm} onCancel={() => setScreen('home')} identity={identity} />;
 
   if (screen === 'wizard' && currentRO)
-    return <>{offlineBanner}{provisorioBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
+    return <>{offlineBanner}{provisorioBanner}{syncMessageBanner}<WizardScreen ro={currentRO} onUpdate={handleUpdate} onSave={handleSave} onCancel={handleCancel} /></>;
 
   if (screen === 'print' && currentRO)
     return <PrintScreen ro={currentRO} onClose={() => setScreen('view')} />;
 
   if (screen === 'view' && currentRO)
-    return <>{offlineBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} /></>;
+    return <>{offlineBanner}{syncMessageBanner}<ViewROScreen ro={currentRO} onBack={handleBack} onPrint={() => setScreen('print')} onEdit={handleEdit} auditEvents={auditEvents} syncState={currentSyncState} /></>;
 
   return <>{offlineBanner}<HomeScreen ros={ros} onNew={handleNew} onView={handleView} onDelete={handleDelete} onDeleteAll={handleDeleteAll}
-    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} onSignOut={() => signOut(auth)} /></>;
+    darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} onSignOut={() => signOut(auth)}
+    recoveryRecords={recoveryRecords} onRetryRecovery={retryRecovery} syncMessage={syncMessage} bulkDeleteMessage={bulkDeleteMessage} /></>;
 }
