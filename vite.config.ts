@@ -45,6 +45,18 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'firebase', test: /node_modules[\/](@firebase|firebase)[\/]/ },
+              { name: 'react-vendor', test: /node_modules[\/](react|react-dom|scheduler)[\/]/ },
+            ],
+          },
+        },
+      },
+    },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
