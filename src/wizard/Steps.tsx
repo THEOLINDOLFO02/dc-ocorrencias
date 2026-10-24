@@ -7,10 +7,12 @@ import { Toggle, Field, Input, Textarea, Checkbox, Card, SecTitle } from '../com
 import { DF, TreesSection, StructuralSection, BeesSection, AnimalsSection, GeologicalSection, HydroSection, FireSection } from '../components/DamageSections';
 import { AgentPicker, AgentMultiPicker } from '../components/AgentPickers';
 import { SignaturePad } from '../components/SignaturePad';
+import { opcoesDeViatura, useViaturas } from '../viaturas';
 
 export type StepProps = { ro: OccurrenceReport; onChange: (u: Partial<OccurrenceReport>) => void };
 
 export function StepCabecalho({ ro, onChange }: StepProps) {
+  const viaturas = useViaturas();
   return (
     <div className="space-y-4">
       <Card>
@@ -47,11 +49,7 @@ export function StepCabecalho({ ro, onChange }: StepProps) {
           <select value={ro.vehicle} onChange={e => onChange({ vehicle: e.target.value })}
             className="w-full rounded-xl px-4 py-3 text-base sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]">
             <option value="">Selecione a viatura...</option>
-            <option value="VTR-001">VTR-001</option>
-            <option value="VTR-002">VTR-002</option>
-            <option value="VTR-003">VTR-003</option>
-            <option value="VTR-004">VTR-004</option>
-            <option value="VTR-005">VTR-005</option>
+            {opcoesDeViatura(viaturas, ro.vehicle).map(v => <option key={v} value={v}>{v}</option>)}
             <option value="Outros">Outros</option>
           </select>
         </Field>

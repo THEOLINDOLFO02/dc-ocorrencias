@@ -142,6 +142,13 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Lista de viaturas publicada pelo painel de gestão (conta de serviço ignora estas regras).
+    // Nenhum cliente do app pode escrever aqui.
+    match /viaturas/{id} {
+      allow read: if isAgent();
+      allow write: if false;
+    }
+
     match /auditLog/{id} {
       allow read: if isAgent();
       allow create: if isAgent() &&
