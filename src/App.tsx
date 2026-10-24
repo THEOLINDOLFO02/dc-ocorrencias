@@ -12,6 +12,7 @@ import { BulkDeleteError, deleteROsInChunks } from './ro-delete';
 import { acknowledgeRecoveryStep, acknowledgeRecoveryThrough, listRecoveryRecords, saveRecoveryRecord, type RecoveryRecord } from './sync-recovery';
 import { checkAgentAuthorizationPure, type AgentIdentityState } from './ro-utils';
 import { Screen, OccurrenceReport } from './types';
+import { iniciarCatalogo, useCatalogo } from './catalogo';
 import { Agent, loadAgentIdentity, AGENTS } from './constants';
 import { nowHHMM, getDefaultInterdicao, normalizeRO, createNewRO, reportUpdateFields } from './report-model';
 import { HomeScreen } from './screens/HomeScreen';
@@ -24,6 +25,7 @@ const PrintScreen = lazy(() => import('./screens/PrintScreen').then(m => ({ defa
 const PinScreen = lazy(() => import('./screens/PinScreen').then(m => ({ default: m.PinScreen })));
 
 function AppInner() {
+  useCatalogo();   // re-renderiza quando o painel de gestão atualiza servidores/viaturas
   const [screen, setScreen] = useState<Screen>('home');
   const [ros, setRos] = useState<OccurrenceReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -613,6 +615,8 @@ function AppInner() {
     recoveryRecords={recoveryRecords} onRetryRecovery={retryRecovery} syncMessage={syncMessage} bulkDeleteMessage={bulkDeleteMessage} /></>;
 }
 
+
+iniciarCatalogo();
 
 export default function App() {
   return (

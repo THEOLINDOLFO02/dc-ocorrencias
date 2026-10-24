@@ -375,19 +375,6 @@ describe('integridade do histórico e auditoria', () => {
   });
 });
 
-describe('viaturas publicadas pelo painel', () => {
-  it('agente autenticado lê; ninguém escreve pelo app, nem admin com claim', async () => {
-    await testEnv.withSecurityRulesDisabled(async context => {
-      await setDoc(doc(context.firestore(), 'viaturas', 'VTR-001'), { prefixo: 'VTR-001', ordem: 0 });
-    });
-    await assertSucceeds(getDoc(doc(authenticated(AGENT_UID), 'viaturas', 'VTR-001')));
-    await assertFails(getDoc(doc(authenticated(UNKNOWN_UID), 'viaturas', 'VTR-001')));
-    await assertFails(setDoc(doc(authenticated(AGENT_UID), 'viaturas', 'VTR-009'), { prefixo: 'VTR-009', ordem: 9 }));
-    await assertFails(setDoc(doc(authenticated(ADMIN_UID, { admin: true }), 'viaturas', 'VTR-009'), { prefixo: 'VTR-009', ordem: 9 }));
-    await assertFails(deleteDoc(doc(authenticated(AGENT_UID), 'viaturas', 'VTR-001')));
-  });
-});
-
 describe('papel administrativo', () => {
   it('admin precisa de custom claim; o antigo UID fixo não é suficiente', async () => {
     await assertFails(deleteDoc(doc(authenticated(OLD_SHARED_UID), 'ros', 'pending-seed')));

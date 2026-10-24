@@ -7,12 +7,12 @@ import { Toggle, Field, Input, Textarea, Checkbox, Card, SecTitle } from '../com
 import { DF, TreesSection, StructuralSection, BeesSection, AnimalsSection, GeologicalSection, HydroSection, FireSection } from '../components/DamageSections';
 import { AgentPicker, AgentMultiPicker } from '../components/AgentPickers';
 import { SignaturePad } from '../components/SignaturePad';
-import { opcoesDeViatura, useViaturas } from '../viaturas';
+import { opcoesDeViatura, useCatalogo } from '../catalogo';
 
 export type StepProps = { ro: OccurrenceReport; onChange: (u: Partial<OccurrenceReport>) => void };
 
 export function StepCabecalho({ ro, onChange }: StepProps) {
-  const viaturas = useViaturas();
+  const { viaturas } = useCatalogo();
   return (
     <div className="space-y-4">
       <Card>

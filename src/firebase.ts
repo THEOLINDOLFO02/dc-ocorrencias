@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import {
+  connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
   persistentSingleTabManager,
@@ -15,7 +16,10 @@ const firebaseConfig = {
   appId: '1:464459225560:web:be82811279ceb37e67baad',
 };
 
-export const app  = initializeApp(firebaseConfig);
+// Teste local integrado (npm run dev:local): usa os emuladores do Firebase, sem tocar no projeto real.
+const usarEmuladores = import.meta.env.VITE_USE_EMULATORS === '1';
+
+export const app  = initializeApp(usarEmuladores ? { ...firebaseConfig, projectId: 'demo-dc-ocorrencias' } : firebaseConfig);
 export const auth = getAuth(app);
 
 // persistentSingleTabManager: compatível com iOS Safari e todos os Android
@@ -25,3 +29,8 @@ export const db = initializeFirestore(app, {
     tabManager: persistentSingleTabManager({ forceOwnership: true }),
   }),
 });
+
+if (usarEmuladores) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8097);
+}

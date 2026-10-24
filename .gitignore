@@ -11,3 +11,4 @@ coverage/
 *.diff
 *.zip
 pacote-auditoria*
+!.env.emulador

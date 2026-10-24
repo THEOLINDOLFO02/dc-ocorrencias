@@ -58,6 +58,8 @@ export default defineConfig(() => {
       },
     },
     server: {
+      // Em desenvolvimento, /dc-painel (catálogo do painel) vai para o Apache local (XAMPP).
+      proxy: { '/dc-painel': { target: 'http://localhost', changeOrigin: true } },
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
